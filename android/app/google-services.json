@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "830376997558",
+    "project_id": "app-academic-connect",
+    "storage_bucket": "app-academic-connect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:830376997558:android:b63d2e87f2bfc1d9ad2c17",
+        "android_client_info": {
+          "package_name": "com.example.ddm_projeto_final"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "830376997558-bmdacfc720ma6mm6ta8cb62vi3q6cjaq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHqfBldOVLJIetlovGJTi-RAR0hh1L6Is"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "830376997558-bmdacfc720ma6mm6ta8cb62vi3q6cjaq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
