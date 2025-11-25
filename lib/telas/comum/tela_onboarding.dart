@@ -1,11 +1,12 @@
+// lib/telas/comum/tela_onboarding.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dots_indicator/dots_indicator.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../providers/provedor_onboarding.dart';
 import '../../themes/app_theme.dart';
 import 'cartao_vidro.dart';
-import 'package:dots_indicator/dots_indicator.dart'; // Pacote para os "pontinhos"
 
-// --- Página 1 do Onboarding ---
 class _SlideOnboarding extends StatelessWidget {
   final String titulo;
   final String descricao;
@@ -19,37 +20,41 @@ class _SlideOnboarding extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Ícone com efeito de vidro
           CartaoVidro(
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(40.0),
               child: Icon(
                 icone, 
-                size: 100, 
-                color: isDark ? AppColors.darkAccent : AppColors.lightPrimary,
+                size: 80, 
+                color: AppColors.primaryPurple, 
               ),
             ),
           ),
           const SizedBox(height: 48),
+          
           Text(
             titulo,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: isDark ? AppColors.darkText : AppColors.lightText,
+            style: GoogleFonts.poppins(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
+          
           Text(
             descricao,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              color: Colors.white70,
+              height: 1.5,
             ),
             textAlign: TextAlign.center,
           ),
@@ -59,7 +64,6 @@ class _SlideOnboarding extends StatelessWidget {
   }
 }
 
-// --- Tela Principal do Onboarding ---
 class TelaOnboarding extends ConsumerStatefulWidget {
   const TelaOnboarding({super.key});
 
@@ -82,63 +86,65 @@ class _TelaOnboardingState extends ConsumerState<TelaOnboarding> {
   }
   
   void _concluirOnboarding() {
-    // Salva que o usuário já viu o onboarding
     ref.read(provedorOnboarding.notifier).completeOnboarding();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    
     final paginas = [
-      _SlideOnboarding(
+      const _SlideOnboarding(
         titulo: "Bem-vindo ao Academic Connect",
-        descricao: "Sua vida acadêmica, organizada em um só lugar.",
-        icone: Icons.school,
+        descricao: "Sua vida acadêmica simplificada. Notas, presença e materiais em um único lugar.",
+        icone: Icons.school_rounded,
       ),
-      _SlideOnboarding(
-        titulo: "Presença por NFC",
-        descricao: "Use seu cartão de estudante para marcar presença de forma rápida e segura.",
-        icone: Icons.nfc,
+      const _SlideOnboarding(
+        titulo: "Chamada Inteligente",
+        descricao: "Esqueça o papel. Marque presença aproximando seu cartão ou celular (NFC).",
+        icone: Icons.nfc_rounded,
       ),
-      _SlideOnboarding(
-        titulo: "Tudo na Palma da Mão",
-        descricao: "Acesse notas, frequência, e comunicados. Vamos começar!",
-        icone: Icons.auto_awesome,
+      const _SlideOnboarding(
+        titulo: "Comunidade Acadêmica",
+        descricao: "Acesse dicas de veteranos, provas antigas e materiais exclusivos da sua disciplina.",
+        icone: Icons.hub_rounded,
       ),
     ];
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: isDark 
-            ? [AppColors.darkSurface, AppColors.darkBg]
-            : [AppColors.lightPrimary.withOpacity(0.3), AppColors.lightBg],
+            colors: [
+              Color(0xFF2C2C2C), 
+              AppColors.background,
+            ], 
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
         child: Stack(
           children: [
-            // Slides
             PageView(
               controller: _controller,
               children: paginas,
             ),
             
-            // Botão "Pular"
+            // Botão Pular
             Positioned(
-              top: 60,
+              top: 50,
               right: 20,
               child: TextButton(
                 onPressed: _concluirOnboarding,
-                child: const Text("Pular"),
+                child: Text(
+                  "Pular", 
+                  style: GoogleFonts.poppins(
+                    color: Colors.white54, 
+                    fontWeight: FontWeight.w600
+                  ),
+                ),
               ),
             ),
             
-            // Indicador de página e Botão "Próximo"
+            // Controles Inferiores
             Positioned(
               bottom: 40,
               left: 24,
@@ -150,10 +156,10 @@ class _TelaOnboardingState extends ConsumerState<TelaOnboarding> {
                     dotsCount: paginas.length,
                     position: _paginaAtual,
                     decorator: DotsDecorator(
-                      color: isDark ? AppColors.darkTextHint : AppColors.lightTextHint,
-                      activeColor: isDark ? AppColors.darkAccent : AppColors.lightPrimary,
+                      color: Colors.white12,
+                      activeColor: AppColors.primaryPurple,
                       size: const Size.square(9.0),
-                      activeSize: const Size(18.0, 9.0),
+                      activeSize: const Size(24.0, 9.0),
                       activeShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5.0)),
                     ),
                   ),
@@ -161,16 +167,25 @@ class _TelaOnboardingState extends ConsumerState<TelaOnboarding> {
                   ElevatedButton(
                     onPressed: () {
                       if (_paginaAtual == paginas.length - 1) {
-                        _concluirOnboarding(); // Última página
+                        _concluirOnboarding();
                       } else {
                         _controller.nextPage(
                           duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeIn,
+                          curve: Curves.easeInOut,
                         );
                       }
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                     child: Text(
-                      _paginaAtual == paginas.length - 1 ? "Começar" : "Próximo"
+                      _paginaAtual == paginas.length - 1 ? "Começar" : "Próximo",
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],

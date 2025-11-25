@@ -2,10 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/mensagem_chat.dart';
-import '../../services/servico_firestore.dart'; // O provedor streamMensagensProvider vem daqui
+import '../../services/servico_firestore.dart';
 import '../../providers/provedor_autenticacao.dart';
 import 'widget_carregamento.dart';
 import 'package:intl/intl.dart';
+import '../../themes/app_theme.dart';
 
 class AbaChatDisciplina extends ConsumerStatefulWidget {
   final String turmaId;
@@ -22,7 +23,6 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
 
   Future<void> _enviarMensagem() async {
     if (_controller.text.trim().isEmpty) return;
-
     final usuario = ref.read(provedorNotificadorAutenticacao).usuario;
     if (usuario == null) return;
 
@@ -30,7 +30,6 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
     if (nomeUsuario.isEmpty) nomeUsuario = usuario.email;
 
     setState(() => _isLoading = true);
-
     final novaMensagem = MensagemChat(
       id: '',
       texto: _controller.text.trim(),
@@ -42,150 +41,136 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
     try {
       await ref.read(servicoFirestoreProvider).enviarMensagem(widget.turmaId, novaMensagem);
       _controller.clear();
-      // Rola para o final da lista
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar: $e'), backgroundColor: Colors.red),
-        );
-      }
+      // Erro silencioso ou snackbar
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Aqui ele usa o provedor definido no final do servico_firestore.dart
     final streamMensagens = ref.watch(streamMensagensProvider(widget.turmaId));
     final meuUid = ref.watch(provedorNotificadorAutenticacao).usuario?.uid;
-    final theme = Theme.of(context);
 
-    return Column(
-      children: [
-        Expanded(
-          child: streamMensagens.when(
-            loading: () => const WidgetCarregamento(),
-            error: (err, st) => Center(child: Text('Erro ao carregar chat: $err')),
-            data: (mensagens) {
-              if (mensagens.isEmpty) {
-                return Center(
-                  child: Text(
-                    'Seja o primeiro a enviar uma mensagem!',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                );
-              }
-              return ListView.builder(
-                controller: _scrollController,
-                reverse: true, // Mostra as mais novas no topo (base da lista)
-                padding: const EdgeInsets.all(16.0),
-                itemCount: mensagens.length,
-                itemBuilder: (context, index) {
-                  final msg = mensagens[index];
-                  final bool souEu = msg.usuarioId == meuUid;
-
-                  return _buildBubble(context, msg, souEu);
-                },
-              );
-            },
-          ),
-        ),
-        // Input de texto
-        Container(
-          padding: const EdgeInsets.all(12.0),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            border: Border(top: BorderSide(color: theme.dividerColor)),
-          ),
-          child: SafeArea(
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Digite uma mensagem...',
-                      border: InputBorder.none,
-                      filled: false,
-                    ),
-                    textCapitalization: TextCapitalization.sentences,
-                    enabled: !_isLoading,
-                    onSubmitted: (_) => _enviarMensagem(),
-                  ),
-                ),
-                IconButton(
-                  icon: _isLoading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(Icons.send, color: theme.colorScheme.primary),
-                  onPressed: _isLoading ? null : _enviarMensagem,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBubble(BuildContext context, MensagemChat msg, bool souEu) {
-    final theme = Theme.of(context);
-    final alignment = souEu ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final color = souEu ? theme.colorScheme.primary : theme.colorScheme.secondaryContainer;
-    final textColor = souEu ? theme.colorScheme.onPrimary : theme.colorScheme.onSecondaryContainer;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: alignment,
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
         children: [
-          // Nome do remetente (se não for eu)
-          if (!souEu)
-            Padding(
-              padding: const EdgeInsets.only(left: 12.0, bottom: 4.0),
-              child: Text(
-                msg.usuarioNome,
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          // Balão da mensagem
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: souEu ? const Radius.circular(16) : const Radius.circular(4),
-                bottomRight: souEu ? const Radius.circular(4) : const Radius.circular(16),
-              ),
-            ),
-            child: Text(
-              msg.texto,
-              style: TextStyle(color: textColor),
+          Expanded(
+            child: streamMensagens.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, st) => const Center(child: Text('Erro no chat', style: TextStyle(color: Colors.white))),
+              data: (mensagens) {
+                if (mensagens.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.white24),
+                        SizedBox(height: 16),
+                        Text('Nenhuma mensagem ainda.', style: TextStyle(color: Colors.white54)),
+                      ],
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true, 
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: mensagens.length,
+                  itemBuilder: (context, index) {
+                    final msg = mensagens[index];
+                    final bool souEu = msg.usuarioId == meuUid;
+                    return _buildBubble(msg, souEu);
+                  },
+                );
+              },
             ),
           ),
-          // Horário
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0, left: 12.0, right: 12.0),
-            child: Text(
-              DateFormat('HH:mm').format(msg.dataHora),
-              style: theme.textTheme.bodySmall,
+          // Input Moderno
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.background,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          hintText: 'Digite uma mensagem...',
+                          hintStyle: TextStyle(color: Colors.white24),
+                          border: InputBorder.none,
+                        ),
+                        textCapitalization: TextCapitalization.sentences,
+                        enabled: !_isLoading,
+                        onSubmitted: (_) => _enviarMensagem(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  CircleAvatar(
+                    backgroundColor: AppColors.primaryPurple,
+                    child: IconButton(
+                      icon: _isLoading
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.send, color: Colors.white, size: 20),
+                      onPressed: _isLoading ? null : _enviarMensagem,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBubble(MensagemChat msg, bool souEu) {
+    return Align(
+      alignment: souEu ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: souEu ? AppColors.primaryPurple : const Color(0xFF383838),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(20),
+            topRight: const Radius.circular(20),
+            bottomLeft: souEu ? const Radius.circular(20) : const Radius.circular(4),
+            bottomRight: souEu ? const Radius.circular(4) : const Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!souEu)
+              Text(msg.usuarioNome, style: const TextStyle(color: AppColors.cardBlue, fontSize: 12, fontWeight: FontWeight.bold)),
+            if (!souEu) const SizedBox(height: 4),
+            Text(msg.texto, style: const TextStyle(color: Colors.white, fontSize: 15)),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Text(
+                DateFormat('HH:mm').format(msg.dataHora),
+                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,232 +2,155 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/turma_professor.dart';
-import '../../providers/provedor_professor.dart';
 import '../../providers/provedores_app.dart';
 import '../comum/widget_carregamento.dart';
 import 'tela_criar_turma.dart';
+// Importamos as telas de ação para o menu de contexto
 import 'tela_chamada_manual.dart';
 import 'tela_presenca_nfc.dart';
 import 'tela_lancar_notas.dart';
 import 'tela_marcar_prova.dart';
 import 'tela_cadastro_nfc_manual.dart';
-import 'tela_detalhes_disciplina_prof.dart';
 import 'tela_historico_chamadas.dart';
-import 'tela_editar_turma.dart'; // NOVO
-import 'tela_visualizar_alunos.dart'; // NOVO
-import '../../providers/provedor_mapas.dart';
+import 'tela_detalhes_disciplina_prof.dart';
+import 'tela_editar_turma.dart';
+import 'tela_visualizar_alunos.dart';
 import '../../l10n/app_localizations.dart';
-import '../comum/animacao_fadein_lista.dart'; 
+import 'package:google_fonts/google_fonts.dart';
 
 class AbaTurmasProfessor extends ConsumerWidget {
   const AbaTurmasProfessor({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppLocalizations.of(context)!;
     final asyncTurmas = ref.watch(provedorStreamTurmasProfessor);
-    final chamadaDiaria = ref.watch(provedorChamadaDiaria);
 
     return Scaffold(
-      body: asyncTurmas.when(
-        loading: () => const WidgetCarregamento(),
-        error: (err, st) => Center(child: Text('Erro: $err')),
-        data: (turmas) {
-          if (turmas.isEmpty) {
-            return const Center(child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text(
-                'Nenhuma turma criada. Clique no botão + para adicionar sua primeira turma.',
-                textAlign: TextAlign.center,
-                ),
-            ));
-          }
-          
-          final widgets = turmas.map((turma) {
-            final bool chamadaIniciada = chamadaDiaria.contains(turma.id);
-            return _buildCardTurma(context, ref, t, turma, chamadaIniciada);
-          }).toList();
+      backgroundColor: Colors.black,
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24, right: 24, top: 60, bottom: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Teacher's",
+                    style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, height: 1.0),
+                  ),
+                  Text(
+                    "Dashboard",
+                    style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, height: 1.0),
+                  ),
+                  const SizedBox(height: 20),
+                  // Ilustração
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      image: DecorationImage(
+                        image: NetworkImage('https://cdn3d.iconscout.com/3d/premium/thumb/teacher-standing-near-board-3d-illustration-download-in-png-blend-fbx-gltf-file-formats--blackboard-female-professor-teaching-school-education-pack-illustrations-4736487.png'),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-          return FadeInListAnimation(children: widgets);
-        },
+          asyncTurmas.when(
+            loading: () => const SliverToBoxAdapter(child: WidgetCarregamento()),
+            error: (err, st) => SliverToBoxAdapter(child: Center(child: Text('Erro: $err'))),
+            data: (turmas) {
+              if (turmas.isEmpty) {
+                return const SliverToBoxAdapter(child: Center(child: Text("Nenhuma turma criada.", style: TextStyle(color: Colors.white))));
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 1.3,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final turma = turmas[index];
+                      final gradients = [
+                         [const Color(0xFF00C6FB), const Color(0xFF005BEA)],
+                         [const Color(0xFFF37335), const Color(0xFFFDC830)],
+                         [const Color(0xFF11998e), const Color(0xFF38ef7d)],
+                         [const Color(0xFFFF5ACD), const Color(0xFFFBDA61)],
+                      ];
+                      final gradient = gradients[index % gradients.length];
+
+                      return _CardTurmaProfGrid(turma: turma, gradient: gradient);
+                    },
+                    childCount: turmas.length,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarTurma()));
-        },
-        child: const Icon(Icons.add),
+        backgroundColor: Colors.white,
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarTurma())),
+        child: const Icon(Icons.add, color: Colors.black),
       ),
     );
   }
+}
 
-  Widget _buildCardTurma(BuildContext context, WidgetRef ref, AppLocalizations t, TurmaProfessor turma, bool chamadaIniciada) {
-    final theme = Theme.of(context);
-    
-    return Card(
-      child: Padding(
+class _CardTurmaProfGrid extends StatelessWidget {
+  final TurmaProfessor turma;
+  final List<Color> gradient;
+
+  const _CardTurmaProfGrid({required this.turma, required this.gradient});
+
+  // Menu de Opções do Professor
+  void _mostrarOpcoes(BuildContext context, AppLocalizations t) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF2C2C2C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: Text(turma.nome, style: theme.textTheme.titleLarge)),
-                // MENU DE OPÇÕES (EDITAR/ALUNOS)
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'editar') {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaEditarTurma(turma: turma)));
-                    } else if (value == 'alunos') {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaVisualizarAlunos(turma: turma)));
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                    const PopupMenuItem<String>(
-                      value: 'editar',
-                      child: ListTile(leading: Icon(Icons.edit), title: Text('Editar Turma'), contentPadding: EdgeInsets.zero),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'alunos',
-                      child: ListTile(leading: Icon(Icons.people), title: Text('Ver Alunos'), contentPadding: EdgeInsets.zero),
-                    ),
-                  ],
-                ),
-              ],
+            Text(turma.nome, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Divider(color: Colors.white24),
+            ListTile(
+              leading: const Icon(Icons.nfc, color: Colors.green),
+              title: const Text("Chamada NFC", style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => TelaPresencaNFC(turma: turma))); },
             ),
-            const SizedBox(height: 4),
-            SelectableText(
-              "Código: ${turma.turmaCode}",
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+            ListTile(
+              leading: const Icon(Icons.list_alt, color: Colors.blue),
+              title: const Text("Chamada Manual", style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => TelaChamadaManual(turma: turma))); },
             ),
-            const SizedBox(height: 16),
-            _buildInfoLinha(
-              context,
-              icone: Icons.group_outlined,
-              texto: '${turma.alunosInscritos.length} ${t.t('prof_turmas_alunos')}',
+            ListTile(
+              leading: const Icon(Icons.history, color: Colors.orange),
+              title: const Text("Histórico de Chamadas", style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => TelaHistoricoChamadas(turma: turma))); },
             ),
-            _buildInfoLinha(
-              context,
-              icone: Icons.schedule_outlined,
-              texto: turma.horario,
+            ListTile(
+              leading: const Icon(Icons.grade, color: Colors.purple),
+              title: const Text("Lançar Notas", style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => TelaLancarNotas(turma: turma))); },
             ),
-            _buildInfoLinha(
-              context,
-              icone: Icons.location_on_outlined,
-              texto: turma.local,
-              isLink: true,
-              onTap: () async {
-                try {
-                  await ref.read(provedorMapas).abrirLocalizacao(turma.local);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-                    );
-                  }
-                }
-              }
-            ),
-            const Divider(height: 24),
-            
-            Row(
-              children: [
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: chamadaIniciada ? t.t('prof_turmas_continuar_nfc') : t.t('prof_turmas_presenca_nfc'),
-                    icon: Icons.nfc,
-                    onTap: () {
-                      ref.read(provedorChamadaDiaria.notifier).iniciarChamada(turma.id);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaPresencaNFC(turma: turma)));
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: chamadaIniciada ? t.t('prof_turmas_continuar_manual') : t.t('prof_turmas_chamada_manual'),
-                    icon: Icons.checklist,
-                    onTap: () {
-                      ref.read(provedorChamadaDiaria.notifier).iniciarChamada(turma.id);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaChamadaManual(turma: turma)));
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: t.t('prof_turmas_lancar_notas'),
-                    icon: Icons.assignment_outlined,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaLancarNotas(turma: turma)));
-                    },
-                    isOutlined: true, 
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: t.t('prof_turmas_marcar_prova'),
-                    icon: Icons.calendar_month_outlined,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaMarcarProva(turma: turma)));
-                    },
-                    isOutlined: true, 
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: t.t('hub_chat_materiais') ?? 'Chat e Materiais',
-                    icon: Icons.hub_outlined,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalhesDisciplinaProf(turma: turma)));
-                    },
-                    isOutlined: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: t.t('prof_acao_cadastrar_nfc') ?? 'Cadastrar NFC',
-                    icon: Icons.person_add_alt_1_outlined,
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaCadastroNfcManual(turma: turma)));
-                    },
-                    isOutlined: true,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildBotaoAcao(
-                    context,
-                    label: 'Histórico de Chamadas',
-                    icon: Icons.history,
-                    onTap: () {
-                       Navigator.push(context, MaterialPageRoute(builder: (_) => TelaHistoricoChamadas(turma: turma)));
-                    },
-                    isOutlined: true,
-                  ),
-                ),
-              ],
+            ListTile(
+              leading: const Icon(Icons.settings, color: Colors.grey),
+              title: const Text("Editar Turma / Alunos", style: TextStyle(color: Colors.white)),
+              onTap: () { Navigator.pop(ctx); Navigator.push(context, MaterialPageRoute(builder: (_) => TelaEditarTurma(turma: turma))); },
             ),
           ],
         ),
@@ -235,69 +158,40 @@ class AbaTurmasProfessor extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoLinha(BuildContext context, {required IconData icone, required String texto, bool isLink = false, VoidCallback? onTap}) {
-    final theme = Theme.of(context);
-    final style = theme.textTheme.bodyMedium?.copyWith(
-      color: isLink ? theme.colorScheme.primary : theme.textTheme.bodyMedium?.color,
-      decoration: isLink ? TextDecoration.underline : TextDecoration.none,
-    );
-
-    final content = Row(
-      children: [
-        Icon(icone, size: 16, color: style?.color),
-        const SizedBox(width: 8),
-        Text(texto, style: style),
-      ],
-    );
-
-    if (isLink) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: content,
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: content,
-    );
-  }
-
-  Widget _buildBotaoAcao(BuildContext context,
-      {required String label, required IconData icon, required VoidCallback onTap, bool isOutlined = false}) {
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     
-    if (isOutlined) {
-      return OutlinedButton.icon(
-        icon: Icon(icon, size: 18),
-        label: Text(label, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalhesDisciplinaProf(turma: turma))),
+      onLongPress: () => _mostrarOpcoes(context, t), // Segurar para abrir menu de gestão
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(24),
         ),
-      );
-    }
-    
-    return ElevatedButton(
-      onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(turma.nome, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold), maxLines: 2),
+                  Text("${turma.alunosInscritos.length} alunos", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onPressed: () => _mostrarOpcoes(context, t),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }

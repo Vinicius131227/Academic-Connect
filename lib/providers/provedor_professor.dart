@@ -1,10 +1,8 @@
 // lib/providers/provedor_professor.dart
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_nfc_kit/flutter_nfc_kit.dart'; 
 import '../models/turma_professor.dart';
-import '../models/solicitacao_aluno.dart';
 import '../models/aluno_chamada.dart';
 import '../services/servico_firestore.dart';
 import 'provedor_tts.dart';
@@ -210,18 +208,16 @@ final provedorChamadaManual = StateNotifierProvider.autoDispose.family<
 // --- NFC ---
 enum StatusNFC { pausado, lendo, indisponivel, erro }
 
-// --- CORREÇÃO: CLASSE RE-ADICIONADA ---
 class AlunoPresenteNFC {
   final String uid; 
   final String nome;
   final String hora;
   AlunoPresenteNFC({required this.uid, required this.nome, required this.hora});
 }
-// --- FIM CORREÇÃO ---
 
 class EstadoPresencaNFC {
   final StatusNFC status;
-  final List<AlunoPresenteNFC> presentes; // Agora reconhece o tipo
+  final List<AlunoPresenteNFC> presentes;
   final String? ultimoAluno;
   final String? erro;
   final String? ultimoErroScan;
@@ -255,7 +251,6 @@ class NotificadorPresencaNFC extends StateNotifier<EstadoPresencaNFC> {
           timeout: const Duration(seconds: 10),
           readIso14443A: true, readIso14443B: true, readIso15693: true,
         );
-        HapticFeedback.mediumImpact();
         String uidNfc = tag.id.replaceAll(' ', ':').toUpperCase();
         if (uidNfc.isEmpty) {
           _feedbackError("Erro na leitura.");
@@ -279,19 +274,17 @@ class NotificadorPresencaNFC extends StateNotifier<EstadoPresencaNFC> {
         
       } catch (e) {
         if (e.toString().contains("timeout")) {
-          debugPrint("Timeout do poll, continuando a ler...");
+           // Timeout normal
         } else if (e.toString().contains("unavailable")) {
           state = state.copyWith(status: StatusNFC.indisponivel, erro: 'NFC foi desligado.');
           break;
         } else {
-          debugPrint("Leitura interrompida: $e");
           break;
         }
       }
     }
     _isPolling = false;
     await FlutterNfcKit.finish();
-    debugPrint("Sessão de leitura finalizada.");
   }
   
   void _feedbackError(String mensagem) {
@@ -302,7 +295,6 @@ class NotificadorPresencaNFC extends StateNotifier<EstadoPresencaNFC> {
   
   void _feedbackSucesso(String uid, String nomeAluno, String hora) {
     _ref.read(ttsProvider).speak("Presença de $nomeAluno confirmada.");
-    // Agora o construtor de AlunoPresenteNFC é reconhecido
     final novoPresente = AlunoPresenteNFC(uid: uid, nome: nomeAluno, hora: hora);
     state = state.copyWith(
       presentes: [...state.presentes, novoPresente],
@@ -325,8 +317,7 @@ class NotificadorPresencaNFC extends StateNotifier<EstadoPresencaNFC> {
   }
 
   Future<void> salvarChamadaNFC(String turmaId, String tipoChamada, DateTime dataChamada) async {
-    // Converte a lista explicitamente para List<String>
-    final presentesUids = state.presentes.map((a) => a.uid).toList().cast<String>();
+    final presentesUids = state.presentes.map((a) => a.uid).toList();
     
     if (presentesUids.isEmpty) {
       throw Exception("Nenhum aluno presente para salvar.");

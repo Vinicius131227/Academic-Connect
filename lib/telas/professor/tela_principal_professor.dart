@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../comum/tela_configuracoes.dart';
 import 'aba_inicio_professor.dart';
 import 'aba_turmas_professor.dart';
-import 'aba_solicitacoes_professor.dart';
-import '../../l10n/app_localizations.dart'; // Importa i18n
+import 'aba_perfil_professor.dart'; // IMPORTANTE
+import '../../l10n/app_localizations.dart';
 
 class TelaPrincipalProfessor extends ConsumerStatefulWidget {
   const TelaPrincipalProfessor({super.key});
@@ -15,79 +15,54 @@ class TelaPrincipalProfessor extends ConsumerStatefulWidget {
 }
 
 class _TelaPrincipalProfessorState extends ConsumerState<TelaPrincipalProfessor> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      setState(() {}); // Atualiza a UI para trocar o título
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  int _indiceAtual = 0;
 
   void _navegarParaAba(int index) {
-    _tabController.animateTo(index);
+    setState(() {
+      _indiceAtual = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-    
-    // Títulos (traduzidos)
+
+    // LISTA DE TELAS ATUALIZADA
+    final List<Widget> _telas = [
+      AbaInicioProfessor(onNavigateToTab: _navegarParaAba),
+      const AbaTurmasProfessor(),
+      const AbaPerfilProfessor(), // Perfil novo
+    ];
+
     final List<String> _titulos = [
       t.t('prof_titulo'),
       t.t('prof_turmas_titulo'),
-      t.t('prof_solicitacoes_titulo'),
+      t.t('perfil_titulo'),
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titulos[_tabController.index]), // Título dinâmico
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: t.t('config_titulo'),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const TelaConfiguracoes()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          AbaInicioProfessor(onNavigateToTab: _navegarParaAba),
-          const AbaTurmasProfessor(),
-          const AbaSolicitacoesProfessor(),
-        ],
+      body: IndexedStack(
+        index: _indiceAtual,
+        children: _telas,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tabController.index,
+        currentIndex: _indiceAtual,
         onTap: _navegarParaAba,
         items: [
           BottomNavigationBarItem(
             icon: const Icon(Icons.home_outlined),
             activeIcon: const Icon(Icons.home),
-            label: t.t('aluno_inicio_titulo'), // Reusa a tradução "Início"
+            label: t.t('aluno_inicio_titulo'),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.book_outlined),
             activeIcon: const Icon(Icons.book),
-            label: t.t('prof_turmas_titulo'), // "Turmas"
+            label: t.t('prof_turmas_titulo'),
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.inbox_outlined),
-            activeIcon: const Icon(Icons.inbox),
-            label: t.t('prof_solicitacoes_titulo'), // "Solicitações"
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
+            label: t.t('perfil_titulo'),
           ),
         ],
       ),

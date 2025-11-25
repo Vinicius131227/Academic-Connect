@@ -1,3 +1,4 @@
+// lib/telas/aluno/tela_cadastro_nfc.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/provedor_aluno.dart';
@@ -14,32 +15,29 @@ class TelaCadastroNFC extends ConsumerWidget {
     final estado = ref.watch(provedorCadastroNFC);
     final notifier = ref.read(provedorCadastroNFC.notifier);
     final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
 
-    // Determina o conteúdo principal baseado no estado
     Widget buildContent() {
       switch (estado.status) {
         case StatusCadastroNFC.scanning:
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    isDark ? AppColors.darkAccent : AppColors.lightPrimary),
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryPurple),
               ),
               const SizedBox(height: 32),
               Icon(Icons.nfc,
-                  size: 100, color: theme.colorScheme.primary),
+                  size: 100, color: AppColors.primaryPurple),
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_aguardando'),
-                style: theme.textTheme.headlineSmall,
+                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 t.t('nfc_cadastro_instrucao'),
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -52,13 +50,13 @@ class TelaCadastroNFC extends ConsumerWidget {
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_sucesso'),
-                style: theme.textTheme.headlineSmall,
+                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 '${t.t('nfc_cadastro_uid')} ${estado.uid}',
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -68,19 +66,19 @@ class TelaCadastroNFC extends ConsumerWidget {
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error, size: 120, color: theme.colorScheme.error),
+              Icon(Icons.error, size: 120, color: AppColors.error),
               const SizedBox(height: 24),
               Text(
                 estado.status == StatusCadastroNFC.error
                     ? t.t('nfc_cadastro_erro')
                     : t.t('nfc_cadastro_nao_suportado'),
-                style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.headlineSmall?.copyWith(color: AppColors.error),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 estado.erro ?? 'Um erro desconhecido ocorreu.',
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -90,18 +88,19 @@ class TelaCadastroNFC extends ConsumerWidget {
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Ícone visível com a cor do tema
               Icon(Icons.nfc,
-                  size: 120, color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                  size: 120, color: AppColors.primaryPurple.withOpacity(0.5)),
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_titulo'),
-                style: theme.textTheme.headlineSmall,
+                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 t.t('nfc_cadastro_instrucao'),
-                style: theme.textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -109,7 +108,6 @@ class TelaCadastroNFC extends ConsumerWidget {
       }
     }
 
-    // Determina os botões baseados no estado
     Widget buildButtons() {
       switch (estado.status) {
         case StatusCadastroNFC.scanning:
@@ -117,7 +115,9 @@ class TelaCadastroNFC extends ConsumerWidget {
             icon: const Icon(Icons.cancel),
             label: Text(t.t('nfc_cadastro_cancelar')),
             style: OutlinedButton.styleFrom(
-              foregroundColor: theme.colorScheme.error,
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: () => notifier.reset(),
           );
@@ -128,6 +128,7 @@ class TelaCadastroNFC extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade700,
               foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: () {
               if (estado.uid != null) {
@@ -141,6 +142,9 @@ class TelaCadastroNFC extends ConsumerWidget {
           return ElevatedButton.icon(
             icon: const Icon(Icons.arrow_back),
             label: Text(t.t('nfc_cadastro_voltar')),
+             style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
             onPressed: () => Navigator.pop(context),
           );
         case StatusCadastroNFC.idle:
@@ -148,6 +152,10 @@ class TelaCadastroNFC extends ConsumerWidget {
           return ElevatedButton.icon(
             icon: const Icon(Icons.nfc),
             label: Text(t.t('nfc_cadastro_iniciar')),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryPurple,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
             onPressed: () => notifier.iniciarLeitura(),
           );
       }
@@ -177,16 +185,15 @@ class TelaCadastroNFC extends ConsumerWidget {
         title: Text(t.t('nfc_cadastro_titulo')),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       extendBodyBehindAppBar: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: isDark 
-            ? [AppColors.darkSurface, AppColors.darkBg]
-            : [AppColors.lightPrimary.withOpacity(0.3), AppColors.lightBg],
+            colors: [Color(0xFF2C2C2C), AppColors.background],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -196,9 +203,7 @@ class TelaCadastroNFC extends ConsumerWidget {
             constraints: const BoxConstraints(maxWidth: 500),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
-              child: isDark 
-                ? CartaoVidro(child: cardContentWrapper) 
-                : Card(elevation: 4, child: cardContentWrapper),
+              child: CartaoVidro(child: cardContentWrapper),
             ),
           ),
         ),

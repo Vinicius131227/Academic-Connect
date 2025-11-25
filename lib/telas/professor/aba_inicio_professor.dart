@@ -1,363 +1,263 @@
 // lib/telas/professor/aba_inicio_professor.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart'; // Import para formatação de data
+import 'package:intl/intl.dart';
 import '../../models/turma_professor.dart';
-import '../../models/solicitacao_aluno.dart';
-import '../comum/animacao_fadein_lista.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart';
 import '../comum/widget_carregamento.dart';
+import '../../themes/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'tela_criar_turma.dart';
 
 class AbaInicioProfessor extends ConsumerWidget {
   final ValueSetter<int> onNavigateToTab;
 
   const AbaInicioProfessor({super.key, required this.onNavigateToTab});
 
-  // --- (NOVO) Helper para filtrar aulas de hoje ---
   String _getDiaSemanaAtual() {
-    // Retorna o nome do dia da semana em português (ex: "seg", "ter")
-    // para bater com o formato de 'horario' (ex: "Seg 14:00-16:00")
     final int weekday = DateTime.now().weekday;
     switch (weekday) {
-      case DateTime.monday:
-        return 'seg';
-      case DateTime.tuesday:
-        return 'ter';
-      case DateTime.wednesday:
-        return 'qua';
-      case DateTime.thursday:
-        return 'qui';
-      case DateTime.friday:
-        return 'sex';
-      case DateTime.saturday:
-        return 'sab';
-      case DateTime.sunday:
-        return 'dom';
-      default:
-        return '';
+      case DateTime.monday: return 'seg';
+      case DateTime.tuesday: return 'ter';
+      case DateTime.wednesday: return 'qua';
+      case DateTime.thursday: return 'qui';
+      case DateTime.friday: return 'sex';
+      case DateTime.saturday: return 'sab';
+      case DateTime.sunday: return 'dom';
+      default: return '';
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    
-    // --- LENDO DADOS REAIS DO FIREBASE ---
-    final nomeProf = ref.watch(provedorNotificadorAutenticacao).usuario?.alunoInfo?.nomeCompleto ?? 'Professor';
+    final nomeProf = ref.watch(provedorNotificadorAutenticacao).usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Professor';
     final asyncTurmas = ref.watch(provedorStreamTurmasProfessor);
-    final solicitacoesPendentes = ref.watch(provedorSolicitacoesPendentes);
-    // --- FIM DOS DADOS ---
 
-    final widgets = [
-      // Card de Boas-Vindas
-      Card(
-        color: theme.colorScheme.primary,
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${t.t('prof_bemvindo')}, $nomeProf!',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                        color: theme.colorScheme.onPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                t.t('prof_resumo'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onPrimary.withOpacity(0.9),
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      
-      // Botões de Ação Rápida
-      Row(
-        children: [
-          Expanded(
-            child: _buildAcaoRapida(
-              context,
-              icon: Icons.nfc,
-              label: t.t('prof_acao_presenca'),
-              onTap: () {
-                onNavigateToTab(1); // Navega para a aba "Turmas"
-              },
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildAcaoRapida(
-              context,
-              icon: Icons.assignment,
-              label: t.t('prof_acao_notas'),
-              onTap: () {
-                onNavigateToTab(1); // Navega para a aba "Turmas"
-              },
-            ),
-          ),
-        ],
-      ),
-      // --- REMOVIDO: Botão de "Enviar Comunicado" ---
-
-      // Aulas de Hoje
-      _buildSecao(
-        context,
-        t: t,
-        titulo: t.t('prof_aulas_hoje'),
-        icone: Icons.calendar_today_outlined,
-        filhos: [
-          asyncTurmas.when(
-            loading: () => const WidgetCarregamento(texto: 'Carregando turmas...'),
-            error: (err, st) => Text('Erro ao carregar turmas: $err'),
-            data: (turmas) {
-              
-              // --- (IMPLEMENTADO) Lógica de filtro para "hoje" ---
-              final diaAtual = _getDiaSemanaAtual();
-              final aulasHoje = turmas
-                  .where((turma) =>
-                      turma.horario.toLowerCase().contains(diaAtual))
-                  .toList();
-              // --- FIM DA LÓGICA ---
-              
-              if (aulasHoje.isEmpty) {
-                return Center(child: Text(t.t('prof_sem_aulas')));
-              }
-              return Column(
-                children: aulasHoje.map((turma) => _buildCardAulaHoje(context, turma)).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-
-      // Solicitações Pendentes
-      _buildSecao(
-        context,
-        t: t,
-        titulo: t.t('prof_solicitacoes'),
-        icone: Icons.inbox_outlined,
-        badgeCount: solicitacoesPendentes.length,
-        filhos: [
-          if (solicitacoesPendentes.isEmpty)
-            Text(t.t('prof_sem_solicitacoes'))
-          else
-            ...solicitacoesPendentes
-                .take(2) // Mostra no máximo 2 na dashboard
-                .map((s) => _buildCardSolicitacaoPendente(context, s)),
-          if (solicitacoesPendentes.length > 2)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: TextButton(
-                onPressed: () {
-                  onNavigateToTab(2); // Navega para a aba "Solicitações"
-                },
-                child: Text(t.t('prof_ver_todas')),
-              ),
-            ),
-        ],
-      ),
-
-      // Stats
-      _buildSecao(
-        context,
-        t: t,
-        titulo: t.t('prof_visao_geral'),
-        icone: Icons.bar_chart_outlined,
-        filhos: [
-          asyncTurmas.when(
-            loading: () => const WidgetCarregamento(texto: ''),
-            error: (err, st) => const Text('Erro ao carregar dados'),
-            data: (turmas) {
-              final int totalAlunos = turmas.fold(0, (prev, turma) => prev + turma.alunosInscritos.length);
-              return Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(context, totalAlunos.toString(), t.t('prof_total_alunos')),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(context, turmas.length.toString(), t.t('prof_turmas_ativas')),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    ];
-    
-    return FadeInListAnimation(children: widgets);
-  }
-
-  // --- Widgets Auxiliares ---
-  Widget _buildAcaoRapida(BuildContext context,
-      {required IconData icon, required String label, required VoidCallback onTap, bool isWide = false}) {
-    final theme = Theme.of(context);
-    
-    if (!isWide) {
-      return Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16.0),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  child: Icon(icon, size: 24, color: theme.colorScheme.primary),
-                ),
-                const SizedBox(height: 12),
-                Text(label, textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16.0),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                child: Icon(icon, size: 24, color: theme.colorScheme.primary),
-              ),
-              const SizedBox(width: 16),
-              Text(label, style: theme.textTheme.titleMedium),
-              const Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 16, color: theme.textTheme.bodySmall?.color),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildSecao(BuildContext context,
-      {required AppLocalizations t,
-      required String titulo,
-      required IconData icone,
-      int? badgeCount,
-      required List<Widget> filhos}) {
-    final theme = Theme.of(context);
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 1. CABEÇALHO
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icone, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(titulo, style: theme.textTheme.titleLarge),
-                if (badgeCount != null && badgeCount > 0) ...[
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Colors.orange[800],
-                    child: Text(
-                      badgeCount.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text("👨‍🏫 ", style: TextStyle(fontSize: 24)),
+                        Text(
+                          "Olá, $nomeProf",
+                          style: GoogleFonts.poppins(
+                            fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textWhite
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      "Gestão de Aulas",
+                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textGrey),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+                  child: const Icon(Icons.school, color: Colors.white),
+                ),
               ],
             ),
-            const Divider(height: 24),
-            ...filhos,
+
+            const SizedBox(height: 24),
+
+            // 2. CARD DE STATUS (Roxo/Azul)
+            asyncTurmas.when(
+              data: (turmas) {
+                final totalAlunos = turmas.fold(0, (sum, t) => sum + t.alunosInscritos.length);
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7B1FA2), Color(0xFFBA68C8)], // Roxo degradê
+                      begin: Alignment.topLeft, end: Alignment.bottomRight
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(color: Colors.purple.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatusItem(icon: Icons.class_, value: turmas.length.toString(), label: "Turmas"),
+                      Container(width: 1, height: 40, color: Colors.white30),
+                      _buildStatusItem(icon: Icons.people, value: totalAlunos.toString(), label: "Alunos"),
+                    ],
+                  ),
+                );
+              },
+              loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
+              error: (_,__) => const SizedBox.shrink(),
+            ),
+
+            const SizedBox(height: 32),
+
+            // 3. ATALHOS RÁPIDOS
+            Text("Acesso Rápido", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildCategoryItem(
+                  icon: Icons.add_circle_outline,
+                  label: "Criar Turma",
+                  color: const Color(0xFFE3F2FD),
+                  iconColor: Colors.blue,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarTurma())),
+                ),
+                _buildCategoryItem(
+                  icon: Icons.nfc,
+                  label: "Chamada NFC",
+                  color: const Color(0xFFE8F5E9),
+                  iconColor: Colors.green,
+                  onTap: () => onNavigateToTab(1), // Vai para aba de turmas
+                ),
+                _buildCategoryItem(
+                  icon: Icons.list_alt,
+                  label: "Manual",
+                  color: const Color(0xFFFFF3E0),
+                  iconColor: Colors.orange,
+                  onTap: () => onNavigateToTab(1),
+                ),
+                _buildCategoryItem(
+                  icon: Icons.grade,
+                  label: "Notas",
+                  color: const Color(0xFFF3E5F5),
+                  iconColor: Colors.purple,
+                  onTap: () => onNavigateToTab(1),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
+
+            // 4. AULAS DE HOJE
+            Text(t.t('prof_aulas_hoje'), style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 16),
+
+            asyncTurmas.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e,s) => const SizedBox.shrink(),
+              data: (turmas) {
+                final diaAtual = _getDiaSemanaAtual();
+                final aulasHoje = turmas.where((turma) => turma.horario.toLowerCase().contains(diaAtual)).toList();
+                
+                if (aulasHoje.isEmpty) {
+                   return Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+                    child: Center(child: Text(t.t('prof_sem_aulas'), style: const TextStyle(color: Colors.grey))),
+                  );
+                }
+                return Column(
+                  children: aulasHoje.map((turma) => _buildClassCard(turma)).toList(),
+                );
+              },
+            ),
+            
+            const SizedBox(height: 80),
           ],
         ),
       ),
     );
   }
-  
-  Widget _buildCardAulaHoje(BuildContext context, TurmaProfessor turma) {
-    final theme = Theme.of(context);
-    // Extrai a hora do campo 'horario'
-    final String hora = turma.horario.split(' ').length > 1 ? turma.horario.split(' ')[1] : turma.horario;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildStatusItem({required IconData icon, required String value, required String label}) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: GoogleFonts.poppins(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryItem({required IconData icon, required String label, required Color color, required Color iconColor, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
         children: [
-          Expanded(child: Text(turma.nome, style: theme.textTheme.bodyLarge)),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(hora, style: theme.textTheme.bodySmall),
-              Row(
-                children: [
-                  Icon(Icons.location_on, size: 14, color: theme.colorScheme.secondary),
-                  Text(turma.local, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ],
+          Container(
+            height: 60, width: 60,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
+            child: Icon(icon, color: iconColor, size: 28),
           ),
+          const SizedBox(height: 8),
+          Text(label, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
         ],
       ),
     );
   }
-  
-  Widget _buildCardSolicitacaoPendente(BuildContext context, SolicitacaoAluno s) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+
+  Widget _buildClassCard(TurmaProfessor turma) {
+    // Extrai hora
+    final String hora = turma.horario.split(' ').length > 1 ? turma.horario.split(' ')[1] : turma.horario;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border(left: BorderSide(color: AppColors.primaryPurple, width: 4)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(hora.split('-')[0], style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("Início", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10)),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Container(height: 40, width: 1, color: Colors.white10),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.nomeAluno, style: theme.textTheme.bodyLarge),
-                Text('${s.disciplina} • ${s.tipo}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.orange[600],
-                          )),
+                Text(turma.nome, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(turma.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
               ],
             ),
           ),
-          Text(DateFormat('dd/MM/yyyy').format(s.data), style: theme.textTheme.bodySmall),
         ],
-      ),
-    );
-  }
-  
-  Widget _buildStatCard(BuildContext context, String valor, String label) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Text(
-              valor,
-              style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.primary),
-            ),
-            const SizedBox(height: 4),
-            Text(label, style: theme.textTheme.bodySmall),
-          ],
-        ),
       ),
     );
   }

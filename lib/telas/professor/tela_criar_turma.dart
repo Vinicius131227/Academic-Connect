@@ -2,11 +2,13 @@
 import 'dart:math'; 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart'; 
 import '../../models/turma_professor.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../services/servico_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../comum/overlay_carregamento.dart';
+import '../../themes/app_theme.dart'; 
 
 class TelaCriarTurma extends ConsumerStatefulWidget {
   const TelaCriarTurma({super.key});
@@ -32,7 +34,6 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
   String? _predioSelecionado;
   int _creditosSelecionados = 4; 
 
-  // Lista de horários
   final List<_HorarioItem> _horarios = [];
   final List<String> _diasSemana = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
@@ -43,6 +44,8 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
     _salaController.dispose();
     super.dispose();
   }
+  
+  // --- FUNÇÕES LÓGICAS QUE FALTAVAM ---
 
   String _gerarStringHorario() {
     return _horarios.map((h) {
@@ -52,43 +55,26 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
     }).join(', ');
   }
 
-  int _calcularCreditosAuto() {
-    int minutosTotais = 0;
-    for (var h in _horarios) {
-      final inicio = h.inicio.hour * 60 + h.inicio.minute;
-      final fim = h.fim.hour * 60 + h.fim.minute;
-      minutosTotais += (fim - inicio);
-    }
-    return (minutosTotais / 60).round();
+  bool _isHorarioValido(TimeOfDay time) {
+    if (time.hour < 8) return false;
+    if (time.hour > 18) return false; 
+    if (time.hour == 18 && time.minute > 0) return false; 
+    return true;
   }
 
-  // --- NOVA LÓGICA: VALIDAÇÃO DE HORÁRIO ---
-  bool _isHorarioAlmoco(TimeOfDay time) {
-    // Intervalo proibido: 12:00 até 13:59 (Basicamente, não pode ter aula entre 12 e 14)
-    // Se começar às 12:00 -> Erro
-    // Se terminar às 12:00 -> OK
-    // Se começar às 14:00 -> OK
-    // Se terminar às 13:30 -> Erro
-    double t = time.hour + (time.minute / 60.0);
-    return t > 12.0 && t < 14.0; // Bloqueia estritamente DENTRO do intervalo
-  }
-  
-  // Verifica se o intervalo cruza o almoço (ex: 11:00 as 15:00)
-  bool _cruzaAlmoco(TimeOfDay inicio, TimeOfDay fim) {
-      double start = inicio.hour + (inicio.minute / 60.0);
-      double end = fim.hour + (fim.minute / 60.0);
-      return start < 12.0 && end > 14.0;
+  int _duracaoHoras(TimeOfDay inicio, TimeOfDay fim) {
+    final minutosInicio = inicio.hour * 60 + inicio.minute;
+    final minutosFim = fim.hour * 60 + fim.minute;
+    return ((minutosFim - minutosInicio) / 60).round();
   }
 
   void _adicionarHorario() {
-    // REGRA: Máximo 2 dias
     if (_horarios.length >= 2) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Máximo de 2 dias por disciplina permitido.'), backgroundColor: Colors.orange),
+         const SnackBar(content: Text('Máximo de 2 dias por disciplina.'), backgroundColor: Colors.orange),
        );
        return;
     }
-
     setState(() {
       _horarios.add(_HorarioItem(
         dia: 'Seg', 
@@ -103,7 +89,7 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
       _horarios.removeAt(index);
     });
   }
-  
+
   Future<void> _pickTime(int index, bool isInicio) async {
     final item = _horarios[index];
     final initial = isInicio ? item.inicio : item.fim;
@@ -111,78 +97,44 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
     final t = await showTimePicker(context: context, initialTime: initial);
     if (t == null) return;
 
-    // VALIDAÇÃO DE ALMOÇO
-    if ((t.hour >= 12 && t.hour < 14)) { 
-         // Permite exatamento 14:00 como inicio ou 12:00 como fim?
-         // Regra pedida: "nao pode escolher das 12 as 14"
-         bool invalido = true;
-         if (isInicio && t.hour == 14 && t.minute == 0) invalido = false; // Pode começar 14:00
-         if (!isInicio && t.hour == 12 && t.minute == 0) invalido = false; // Pode terminar 12:00
-         
-         if (invalido) {
-            if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Horário de almoço (12:00 - 14:00) não permitido.'), backgroundColor: Colors.red),
-                );
-            }
-            return;
-         }
+    if (!_isHorarioValido(t) && !(t.hour == 18 && t.minute == 0)) { 
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Horário permitido: 08:00 às 18:00.'), backgroundColor: Colors.red));
+       return;
+    }
+
+    if ((t.hour == 12 && t.minute > 0) || t.hour == 13 || (t.hour == 12 && isInicio)) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Horário de almoço (12h-14h) bloqueado.'), backgroundColor: Colors.red));
+       return;
+    }
+
+    TimeOfDay tempInicio = isInicio ? t : item.inicio;
+    TimeOfDay tempFim = isInicio ? item.fim : t;
+    
+    if ((tempFim.hour * 60 + tempFim.minute) <= (tempInicio.hour * 60 + tempInicio.minute)) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hora fim deve ser maior que início.'), backgroundColor: Colors.red));
+       return;
+    }
+
+    int duracao = _duracaoHoras(tempInicio, tempFim);
+    
+    if (_creditosSelecionados == 2 && duracao > 2) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Disciplina de 2 créditos: Máx 2 horas.'), backgroundColor: Colors.red));
+       return;
+    }
+    if (duracao > 4) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aula muito longa (Máx 4h).'), backgroundColor: Colors.red));
+       return;
     }
 
     setState(() {
-      if (isInicio) {
-        item.inicio = t;
-      } else {
-        item.fim = t;
-      }
+      if (isInicio) item.inicio = t; else item.fim = t;
     });
-  }
-
-  String _gerarCodigoAleatorio({int length = 6}) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    Random rnd = Random();
-    return String.fromCharCodes(Iterable.generate(
-        length, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
-  }
-
-  void _mostrarDialogCodigo(BuildContext context, String codigo) {
-    final t = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.t('criar_turma_sucesso')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.t('criar_turma_codigo_desc')),
-            const SizedBox(height: 16),
-            Center(
-              child: SelectableText(
-                codigo,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            child: Text(t.t('criar_turma_ok')),
-            onPressed: () {
-              Navigator.pop(ctx); 
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _salvarTurma() async {
     if (!_formKey.currentState!.validate() || _predioSelecionado == null) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Por favor, preencha todos os campos e selecione o prédio.'), backgroundColor: Colors.red),
+         const SnackBar(content: Text('Preencha todos os campos e selecione o prédio.'), backgroundColor: Colors.red),
        );
        return;
     }
@@ -193,16 +145,6 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
        return;
     }
     
-    // Validação final de almoço
-    for (var h in _horarios) {
-        if (_cruzaAlmoco(h.inicio, h.fim)) {
-             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Uma das aulas cruza o horário de almoço (12-14h). Ajuste.'), backgroundColor: Colors.red),
-             );
-             return;
-        }
-    }
-
     final professorId = ref.read(provedorNotificadorAutenticacao).usuario?.uid;
     if (professorId == null) return;
 
@@ -236,154 +178,215 @@ class _TelaCriarTurmaState extends ConsumerState<TelaCriarTurma> {
     }
   }
 
+  void _mostrarDialogCodigo(BuildContext context, String codigo) {
+      final t = AppLocalizations.of(context)!;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.t('criar_turma_sucesso')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t.t('criar_turma_codigo_desc')),
+              const SizedBox(height: 16),
+              Center(
+                child: SelectableText(
+                  codigo,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              child: Text(t.t('criar_turma_ok')),
+              onPressed: () {
+                Navigator.pop(ctx); 
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+   
+   InputDecoration _inputDecor(String label, {String? hint}) {
+      return InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: AppColors.surface,
+        labelStyle: TextStyle(color: Colors.grey[400]),
+        hintStyle: TextStyle(color: Colors.grey[600]),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primaryPurple)),
+      );
+   }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final estaCarregando = ref.watch(provedorCarregando);
     
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(t.t('criar_turma_titulo')),
+        title: Text(t.t('criar_turma_titulo'), style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      DropdownButtonFormField<int>(
-                        value: _creditosSelecionados,
-                        decoration: const InputDecoration(labelText: 'Créditos da Disciplina *'),
-                        items: [4, 2].map((int value) => DropdownMenuItem(
-                          value: value,
-                          child: Text('$value Créditos'),
-                        )).toList(),
-                        onChanged: estaCarregando ? null : (v) => setState(() => _creditosSelecionados = v!),
-                      ),
-                      const SizedBox(height: 16),
-
-                      TextFormField(
-                        controller: _nomeController,
-                        decoration: InputDecoration(
-                          labelText: t.t('criar_turma_nome'),
-                          hintText: t.t('criar_turma_nome_hint'),
-                        ),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // O campo de horário manual foi removido em favor da lista dinâmica abaixo
-                      
-                      // Local (Prédio e Sala)
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: DropdownButtonFormField<String>(
-                              value: _predioSelecionado,
-                              decoration: const InputDecoration(labelText: 'Prédio *'),
-                              items: AppLocalizations.predios.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-                              onChanged: estaCarregando ? null : (v) => setState(() => _predioSelecionado = v),
-                              validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: _salaController,
-                              decoration: const InputDecoration(
-                                labelText: 'Sala *',
-                                hintText: 'Ex: 105',
-                              ),
-                              validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              Text("Dados Básicos", style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _nomeController,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecor(t.t('criar_turma_nome'), hint: 'Ex: Cálculo 1'),
+                validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-              // Seção de Horários Dinâmicos
+              DropdownButtonFormField<int>(
+                value: _creditosSelecionados,
+                dropdownColor: AppColors.surface,
+                style: const TextStyle(color: Colors.white),
+                decoration: _inputDecor('Créditos'),
+                items: [4, 2].map((int value) => DropdownMenuItem(
+                  value: value,
+                  child: Text('$value Créditos'),
+                )).toList(),
+                onChanged: estaCarregando ? null : (v) => setState(() => _creditosSelecionados = v!),
+              ),
+              
+              const SizedBox(height: 24),
+              Text("Localização", style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<String>(
+                      value: _predioSelecionado,
+                      dropdownColor: AppColors.surface,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecor('Prédio'),
+                      items: AppLocalizations.predios.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                      onChanged: estaCarregando ? null : (v) => setState(() => _predioSelecionado = v),
+                      validator: (v) => v == null ? 'Obrigatório' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: TextFormField(
+                      controller: _salaController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _inputDecor('Sala', hint: 'Ex: 102'),
+                      validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Horários das Aulas (Max 2 dias)', style: Theme.of(context).textTheme.titleMedium),
-                  // Só permite adicionar se tiver menos de 2
+                  Text('Horários', style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 16)),
                   IconButton(
-                    icon: Icon(Icons.add_circle, color: _horarios.length < 2 ? Colors.green : Colors.grey), 
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
+                      child: Icon(Icons.add, color: _horarios.length < 2 ? AppColors.success : Colors.grey)
+                    ), 
                     onPressed: _horarios.length < 2 ? _adicionarHorario : null
                   ),
                 ],
               ),
-              const Divider(),
               
               if (_horarios.isEmpty)
-                const Padding(padding: EdgeInsets.all(16), child: Text('Adicione os dias e horários.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey))),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white12),
+                    borderRadius: BorderRadius.circular(16)
+                  ),
+                  child: const Center(child: Text('Clique no + para adicionar horários.', style: TextStyle(color: Colors.grey))),
+                ),
 
               ..._horarios.asMap().entries.map((entry) {
                 int index = entry.key;
                 _HorarioItem item = entry.value;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      children: [
-                        // Dia da Semana
-                        DropdownButton<String>(
-                          value: item.dia,
-                          items: _diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                          onChanged: (v) => setState(() => item.dia = v!),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      DropdownButton<String>(
+                        value: item.dia,
+                        underline: const SizedBox(),
+                        dropdownColor: AppColors.background,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        items: _diasSemana.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (v) => setState(() => item.dia = v!),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () => _pickTime(index, true),
+                              child: Text(item.inicio.format(context), style: const TextStyle(color: Colors.white, fontSize: 16)),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8.0),
+                              child: Icon(Icons.arrow_forward, size: 14, color: Colors.grey),
+                            ),
+                            GestureDetector(
+                              onTap: () => _pickTime(index, false),
+                              child: Text(item.fim.format(context), style: const TextStyle(color: Colors.white, fontSize: 16)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        // Hora Início
-                        InkWell(
-                          child: Container(
-                             padding: const EdgeInsets.all(8),
-                             decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(4)),
-                             child: Text('${item.inicio.format(context)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          onTap: () => _pickTime(index, true),
-                        ),
-                        const Text(' às '),
-                        // Hora Fim
-                        InkWell(
-                          child: Container(
-                             padding: const EdgeInsets.all(8),
-                             decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(4)),
-                             child: Text('${item.fim.format(context)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                          onTap: () => _pickTime(index, false),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _removerHorario(index),
-                        ),
-                      ],
-                    ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                        onPressed: () => _removerHorario(index),
+                      ),
+                    ],
                   ),
                 );
               }),
 
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                icon: estaCarregando 
-                  ? Container(width: 20, height: 20, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.save),
-                label: Text(estaCarregando ? 'Salvando...' : t.t('criar_turma_botao')), 
-                onPressed: estaCarregando ? null : _salvarTurma,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: estaCarregando ? null : _salvarTurma,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 8,
+                  ),
+                  child: Text(estaCarregando ? 'Salvando...' : 'Criar Turma', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
               ),
             ],
           ),

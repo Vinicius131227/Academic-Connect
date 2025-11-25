@@ -1,159 +1,155 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Classe para guardar nossas cores (baseada nas suas paletas)
 class AppColors {
-  // Paleta Escura (Roxo/Preto)
-  static const Color darkBg = Color(0xFF1A1A2E); // Um fundo quase preto
-  static const Color darkSurface = Color(0xFF240046); // Card principal (Roxo escuro)
-  static const Color darkPrimary = Color(0xFF7B2CBF); // Roxo principal
-  static const Color darkAccent = Color(0xFF9D4EDD); // Roxo mais claro
+  // --- CORES FIXAS ---
+  static const Color primaryPurple = Color(0xFF8C52FF); 
+  static const Color secondaryPurple = Color(0xFF9D5CFF); 
+  static const Color cardYellow = Color(0xFFFBC02D);
+  static const Color cardOrange = Color(0xFFFF7043);
+  static const Color cardBlue = Color(0xFF42A5F5);
+  static const Color cardGreen = Color(0xFF66BB6A);
 
-  // Paleta Clara (Lilás/Bege)
-  static const Color lightBg = Color(0xFFF8F7FF); // Fundo (Branco gelo/Lilás)
-  static const Color lightSurface = Color(0xFFFFFFFF); // Card (Branco puro)
-  static const Color lightPrimary = Color(0xFF9370DB); // Lilás (do seu exemplo)
-  static const Color lightAccent = Color(0xFFCBA2CB); // Lilás claro (do seu exemplo)
+  // --- CORES ESCURO ---
+  static const Color backgroundDark = Color(0xFF181818); 
+  static const Color surfaceDark = Color(0xFF2C2C2C);    
+  static const Color textWhite = Colors.white;
+  static const Color textGreyDark = Colors.white54;
+
+  // --- CORES CLARO ---
+  static const Color backgroundLight = Color(0xFFF4F6F8); 
+  static const Color surfaceLight = Colors.white;         
+  static const Color textBlack = Color(0xFF1A1A1A);       
+  static const Color textGreyLight = Color(0xFF757575);   
   
-  // Cores Neutras
-  static const Color lightText = Color(0xFF000000);
-  static const Color darkText = Color(0xFFFFFFFF);
-  static const Color lightTextSecondary = Color(0xFF5A5A5A);
-  static const Color darkTextSecondary = Color(0xFFB0B0B0);
-  static const Color lightTextHint = Color(0xFF9E9E9E);
-  static const Color darkTextHint = Color(0xFF757575);
+  static const Color error = Color(0xFFCF6679);
+  static const Color success = Color(0xFF66BB6A);
+
+  // --- ALIASES DE COMPATIBILIDADE ---
+  static const Color background = backgroundDark; 
+  static const Color surface = surfaceDark;       
+  static const Color inputFill = surfaceDark;
+  static const Color textGrey = textGreyDark;
+  
+  static const Color darkBg = backgroundDark;
+  static const Color darkSurface = surfaceDark;
+  static const Color lightBg = backgroundLight;
+  static const Color lightSurface = surfaceLight;
+  static const Color darkText = textWhite;
+  static const Color lightText = textBlack;
+  static const Color darkTextSecondary = textGreyDark;
+  static const Color lightTextSecondary = textGreyLight;
+  static const Color darkTextHint = textGreyDark;
+  static const Color lightTextHint = textGreyLight;
+  static const Color darkAccent = primaryPurple;
+  static const Color lightAccent = primaryPurple;
+  static const Color darkPrimary = primaryPurple;
+  static const Color lightPrimary = primaryPurple;
 }
 
 class AppTheme {
+  // --- TEMA ESCURO ---
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: AppColors.backgroundDark,
+      primaryColor: AppColors.primaryPurple,
+      
+      // Define a cor padrão dos cards via colorScheme
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.primaryPurple,
+        onPrimary: Colors.white,
+        secondary: AppColors.secondaryPurple,
+        surface: AppColors.surfaceDark, // Isso define a cor dos Cards automaticamente
+        background: AppColors.backgroundDark,
+        error: AppColors.error,
+      ),
+
+      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).apply(
+        bodyColor: AppColors.textWhite,
+        displayColor: AppColors.textWhite,
+      ),
+      
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        iconTheme: const IconThemeData(color: AppColors.textWhite),
+        titleTextStyle: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textWhite),
+      ),
+
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.backgroundDark,
+        selectedItemColor: AppColors.primaryPurple,
+        unselectedItemColor: Colors.white24,
+        type: BottomNavigationBarType.fixed,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+      ),
+      
+      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryPurple, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)))),
+      
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.transparent,
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey.shade800)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primaryPurple)),
+      ),
+      
+      iconTheme: const IconThemeData(color: Colors.white),
+    );
+  }
 
   // --- TEMA CLARO ---
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.lightBg,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.lightPrimary,
-        brightness: Brightness.light,
-        surface: AppColors.lightSurface, // Fundo dos Cards
-        background: AppColors.lightBg, // Fundo do App
-      ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme).copyWith(
-        titleLarge: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.lightText),
-        titleMedium: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.lightText),
-        bodyMedium: const TextStyle(color: AppColors.lightTextSecondary),
-        bodySmall: const TextStyle(color: AppColors.lightTextHint),
-      ),
-      appBarTheme: AppBarTheme(
-        elevation: 0,
-        backgroundColor: AppColors.lightPrimary,
-        foregroundColor: AppColors.darkText, // Texto branco no AppBar
-      ),
-      
-      // --- CORREÇÃO AQUI ---
-      cardTheme: CardThemeData( 
-        elevation: 0, 
-        color: AppColors.lightSurface,
-        margin: const EdgeInsets.only(bottom: 16.0), 
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0), 
-          side: BorderSide(color: Colors.grey[200]!),
-        ),
+      scaffoldBackgroundColor: AppColors.backgroundLight,
+      primaryColor: AppColors.primaryPurple,
+
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.primaryPurple,
+        onPrimary: Colors.white,
+        secondary: AppColors.secondaryPurple,
+        surface: AppColors.surfaceLight, // Cor dos Cards no modo claro
+        background: AppColors.backgroundLight,
+        error: AppColors.error,
       ),
 
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide.none,
-        ),
-        filled: true,
-        fillColor: Colors.grey[150],
+      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme).apply(
+        bodyColor: AppColors.textBlack,
+        displayColor: AppColors.textBlack,
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          backgroundColor: AppColors.lightPrimary,
-          foregroundColor: AppColors.darkText,
-        ),
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: AppColors.lightSurface,
-        selectedItemColor: AppColors.lightPrimary,
-        unselectedItemColor: AppColors.lightTextHint,
-        elevation: 5,
-        type: BottomNavigationBarType.fixed,
-      ),
-    );
-  }
 
-  // --- TEMA ESCURO ---
-  static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.darkBg,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.darkPrimary,
-        brightness: Brightness.dark,
-        surface: AppColors.darkSurface, // Fundo dos Cards
-        background: AppColors.darkBg, // Fundo do App
-        onSurface: AppColors.darkText,
-      ),
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
-        titleLarge: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText),
-        titleMedium: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.darkText),
-        bodyMedium: const TextStyle(color: AppColors.darkTextSecondary),
-        bodySmall: const TextStyle(color: AppColors.darkTextHint),
-      ),
       appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: AppColors.darkSurface, // AppBar escura
-        foregroundColor: AppColors.darkText,
+        centerTitle: false,
+        iconTheme: const IconThemeData(color: AppColors.textBlack),
+        titleTextStyle: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textBlack),
       ),
-      
-      cardTheme: CardThemeData(
-        elevation: 0,
-        color: AppColors.darkSurface,
-        margin: const EdgeInsets.only(bottom: 16.0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          side: BorderSide(color: AppColors.darkPrimary.withOpacity(0.5)),
-        ),
-      ),
-      
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12.0),
-          borderSide: BorderSide.none,
-        ),
-        filled: true,
-        fillColor: AppColors.darkBg, // Inputs mais escuros
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          backgroundColor: AppColors.darkPrimary,
-          foregroundColor: AppColors.darkText,
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.darkAccent,
-        ),
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: AppColors.darkSurface,
-        selectedItemColor: AppColors.darkAccent,
-        unselectedItemColor: AppColors.darkTextHint,
-        elevation: 5,
+
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        selectedItemColor: AppColors.primaryPurple,
+        unselectedItemColor: Colors.black26,
         type: BottomNavigationBarType.fixed,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
       ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryPurple, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)))),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.black12)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primaryPurple)),
+      ),
+      
+      iconTheme: const IconThemeData(color: AppColors.textBlack),
     );
   }
 }

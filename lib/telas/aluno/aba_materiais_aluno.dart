@@ -1,9 +1,8 @@
 // lib/telas/aluno/aba_materiais_aluno.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../models/material_aula.dart';
-import '../../models/video_recomendado.dart'; // NOVO IMPORT
+import '../../models/video_recomendado.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/servico_firestore.dart';
 import '../comum/widget_carregamento.dart';
@@ -11,31 +10,23 @@ import '../comum/tela_webview.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http; 
 import 'dart:convert';
+import '../../themes/app_theme.dart'; // CORES NOVAS
 
-// --- PROVEDOR DA API DE VÍDEOS (INVIDIOUS) ---
 final videosRecomendadosProvider = FutureProvider.family<List<VideoRecomendado>, String>((ref, nomeMateria) async {
-  // Limpa o nome para busca (Ex: "Cálculo 1" -> "Calculo")
   final termoBusca = nomeMateria.split(' ')[0]; 
-  
   try {
-    // Usamos uma instância pública do Invidious (API do YouTube sem chave)
-    // Se esta instância cair, pode-se trocar por outra (ex: inv.tux.pizza, yewtu.be)
+    // Usando Invidious para não precisar de API Key
     final url = Uri.parse('https://inv.tux.pizza/api/v1/search?q=aula+$termoBusca&type=video&sort=relevance');
-    
     final response = await http.get(url);
-
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
-      // Pega os 5 primeiros resultados
       return data.take(5).map((json) => VideoRecomendado.fromJson(json)).toList();
     }
     return [];
   } catch (e) {
-    // Retorna lista vazia em caso de erro de conexão
     return [];
   }
 });
-// ------------------------------------
 
 class AbaMateriaisAluno extends ConsumerWidget {
   final String turmaId;
@@ -50,9 +41,9 @@ class AbaMateriaisAluno extends ConsumerWidget {
   IconData _getIconForType(TipoMaterial tipo) {
     switch (tipo) {
       case TipoMaterial.link: return Icons.link;
-      case TipoMaterial.video: return Icons.videocam_outlined;
-      case TipoMaterial.prova: return Icons.description_outlined;
-      case TipoMaterial.outro: return Icons.attachment;
+      case TipoMaterial.video: return Icons.play_circle_fill;
+      case TipoMaterial.prova: return Icons.assignment;
+      case TipoMaterial.outro: return Icons.attach_file;
     }
   }
 
@@ -63,199 +54,177 @@ class AbaMateriaisAluno extends ConsumerWidget {
     
     final streamMateriais = ref.watch(streamMateriaisProvider(turmaId));
     final streamMateriaisAntigos = ref.watch(streamMateriaisAntigosProvider(nomeBase));
-    
-    // Chama a API de Vídeos
     final asyncVideos = ref.watch(videosRecomendadosProvider(nomeBase));
 
-    return CustomScrollView(
-      slivers: [
-        // --- SEÇÃO 1: MATERIAIS DA TURMA ---
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Materiais Postados', style: Theme.of(context).textTheme.titleLarge),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          // Título
+          SliverToBoxAdapter(
+             child: Padding(
+               padding: const EdgeInsets.all(24.0),
+               child: Text("Materiais da Aula", style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+             ),
           ),
-        ),
-        
-        streamMateriais.when(
-          loading: () => const SliverToBoxAdapter(child: WidgetCarregamento()),
-          error: (err, st) => SliverToBoxAdapter(child: Center(child: Text('Erro: $err'))),
-          data: (materiais) {
-            if (materiais.isEmpty) {
-              return SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Text(t.t('materiais_vazio_aluno'), textAlign: TextAlign.center),
+
+          // Lista de Materiais (Stream)
+          streamMateriais.when(
+            loading: () => const SliverToBoxAdapter(child: WidgetCarregamento()),
+            error: (e, s) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            data: (materiais) {
+              if (materiais.isEmpty) {
+                 return SliverToBoxAdapter(
+                   child: Container(
+                     margin: const EdgeInsets.symmetric(horizontal: 24),
+                     padding: const EdgeInsets.all(24),
+                     decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+                     child: const Center(child: Text("Professor ainda não postou materiais.", style: TextStyle(color: Colors.white54))),
+                   ),
+                 );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildMaterialCard(context, materiais[index], AppColors.cardBlue),
+                    childCount: materiais.length,
                   ),
                 ),
               );
-            }
-            return SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildMaterialCard(context, materiais[index], _getIconForType(materiais[index].tipo)),
-                childCount: materiais.length,
-              ),
-            );
-          },
-        ),
-
-        // --- SEÇÃO 2: PROVAS ANTERIORES ---
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-            child: Text('Banco de Provas Antigas', style: Theme.of(context).textTheme.titleLarge),
+            },
           ),
-        ),
 
-        streamMateriaisAntigos.when(
-          loading: () => const SliverToBoxAdapter(child: WidgetCarregamento()),
-          error: (err, st) => SliverToBoxAdapter(child: Center(child: Text('Erro: $err'))),
-          data: (materiaisAntigos) {
-            final materiaisFiltrados = materiaisAntigos.where((m) => m.tipo == TipoMaterial.prova).toList();
-
-            if (materiaisFiltrados.isEmpty) {
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text('Nenhuma prova encontrada para "$nomeBase".', style: TextStyle(color: Colors.grey[600])),
-                ),
-              );
-            }
-            return SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildMaterialCard(context, materiaisFiltrados[index], Icons.history_edu, isAntigo: true),
-                childCount: materiaisFiltrados.length,
-              ),
-            );
-          },
-        ),
-        
-        // --- SEÇÃO 3: VÍDEOS RECOMENDADOS (API) ---
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-            child: Row(
-              children: [
-                const Icon(Icons.play_circle_filled, color: Colors.red),
-                const SizedBox(width: 8),
-                Text('Vídeo Aulas Recomendadas (YouTube)', style: Theme.of(context).textTheme.titleLarge),
-              ],
-            ),
+          // Seção Provas Antigas
+          SliverToBoxAdapter(
+             child: Padding(
+               padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+               child: Text("Banco de Provas Antigas", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+             ),
           ),
-        ),
-        
-        asyncVideos.when(
-          data: (videos) {
-             if (videos.isEmpty) {
-               return const SliverToBoxAdapter(
-                 child: Padding(padding: EdgeInsets.all(16), child: Text("Sem recomendações de vídeo no momento.")),
+
+          streamMateriaisAntigos.when(
+            loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+            error: (e, s) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            data: (materiais) {
+               final provas = materiais.where((m) => m.tipo == TipoMaterial.prova).toList();
+               if (provas.isEmpty) {
+                 return const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Nenhuma prova antiga encontrada.", style: TextStyle(color: Colors.white54))));
+               }
+               return SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => _buildMaterialCard(context, provas[index], AppColors.cardOrange),
+                      childCount: provas.length,
+                    ),
+                  ),
                );
-             }
-             return SliverToBoxAdapter(
-               child: SizedBox(
-                 height: 240, // Altura do carrossel
-                 child: ListView.builder(
-                   scrollDirection: Axis.horizontal,
-                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                   itemCount: videos.length,
-                   itemBuilder: (context, index) {
-                     final video = videos[index];
-                     return Container(
-                       width: 200, // Card mais largo para vídeo
-                       margin: const EdgeInsets.symmetric(horizontal: 6),
-                       child: Card(
-                         clipBehavior: Clip.antiAlias,
-                         elevation: 3,
-                         child: InkWell(
-                           onTap: () {
-                             Navigator.push(context, MaterialPageRoute(builder: (_) => TelaWebView(url: video.videoUrl, titulo: video.titulo)));
-                           },
-                           child: Column(
-                             crossAxisAlignment: CrossAxisAlignment.start,
-                             children: [
-                               // Thumbnail
-                               Expanded(
-                                 flex: 3,
-                                 child: Stack(
-                                   fit: StackFit.expand,
-                                   children: [
-                                     video.thumbnailUrl.isNotEmpty
-                                         ? Image.network(video.thumbnailUrl, fit: BoxFit.cover)
-                                         : Container(color: Colors.black, child: const Icon(Icons.play_arrow, color: Colors.white)),
-                                     
-                                     if (video.duracao.isNotEmpty)
-                                       Positioned(
-                                         bottom: 8,
-                                         right: 8,
-                                         child: Container(
-                                           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                           color: Colors.black.withOpacity(0.8),
-                                           child: Text(video.duracao, style: const TextStyle(color: Colors.white, fontSize: 10)),
-                                         ),
-                                       ),
-                                   ],
+            },
+          ),
+
+          // Seção Vídeos (YouTube)
+          SliverToBoxAdapter(
+             child: Padding(
+               padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+               child: Row(
+                 children: [
+                   const Icon(Icons.play_circle_fill, color: Colors.red),
+                   const SizedBox(width: 8),
+                   Text("Vídeo Aulas Recomendadas", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                 ],
+               ),
+             ),
+          ),
+
+          asyncVideos.when(
+            data: (videos) {
+               if (videos.isEmpty) return const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Sem vídeos no momento.", style: TextStyle(color: Colors.white54))));
+               
+               return SliverToBoxAdapter(
+                 child: SizedBox(
+                   height: 200,
+                   child: ListView.builder(
+                     scrollDirection: Axis.horizontal,
+                     padding: const EdgeInsets.symmetric(horizontal: 24),
+                     itemCount: videos.length,
+                     itemBuilder: (context, index) {
+                       final video = videos[index];
+                       return Container(
+                         width: 260,
+                         margin: const EdgeInsets.only(right: 16),
+                         child: Card(
+                           clipBehavior: Clip.antiAlias,
+                           color: AppColors.surface,
+                           child: InkWell(
+                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaWebView(url: video.videoUrl, titulo: video.titulo))),
+                             child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                 Expanded(
+                                   child: Image.network(
+                                     video.thumbnailUrl, 
+                                     fit: BoxFit.cover, 
+                                     width: double.infinity,
+                                     errorBuilder: (c,e,s) => Container(color: Colors.black, child: const Center(child: Icon(Icons.play_arrow, color: Colors.white))),
+                                   ),
                                  ),
-                               ),
-                               // Informações
-                               Expanded(
-                                 flex: 2,
-                                 child: Padding(
-                                   padding: const EdgeInsets.all(8.0),
+                                 Padding(
+                                   padding: const EdgeInsets.all(12),
                                    child: Column(
                                      crossAxisAlignment: CrossAxisAlignment.start,
                                      children: [
-                                       Text(video.titulo, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                       const Spacer(),
-                                       Row(
-                                         children: [
-                                           const Icon(Icons.person, size: 12, color: Colors.grey),
-                                           const SizedBox(width: 4),
-                                           Expanded(child: Text(video.canal, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey))),
-                                         ],
-                                       )
+                                       Text(video.titulo, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                       Text(video.canal, style: const TextStyle(color: Colors.white54, fontSize: 12)),
                                      ],
                                    ),
-                                 ),
-                               ),
-                             ],
+                                 )
+                               ],
+                             ),
                            ),
                          ),
-                       ),
-                     );
-                   },
+                       );
+                     },
+                   ),
                  ),
-               ),
-             );
-          },
-          loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-          error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()), 
-        ),
-        
-        // Espaço extra no final
-        const SliverToBoxAdapter(child: SizedBox(height: 40)),
-      ],
+               );
+            },
+            loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+            error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+          ),
+          
+          const SliverToBoxAdapter(child: SizedBox(height: 50)),
+        ],
+      ),
     );
   }
 
-  Widget _buildMaterialCard(BuildContext context, MaterialAula material, IconData icon, {bool isAntigo = false}) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+  Widget _buildMaterialCard(BuildContext context, MaterialAula material, Color iconBgColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isAntigo ? Colors.blueGrey.withOpacity(0.1) : theme.colorScheme.primary.withOpacity(0.1),
-          child: Icon(icon, color: isAntigo ? Colors.blueGrey : theme.colorScheme.primary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: iconBgColor.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(_getIconForType(material.tipo), color: iconBgColor),
         ),
-        title: Text(material.titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(material.titulo, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         subtitle: Text(
-          '${isAntigo ? 'Arquivado em: ' : ''}${DateFormat('dd/MM/yy').format(material.dataPostagem)}',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+          DateFormat('dd/MM/yyyy').format(material.dataPostagem),
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
         ),
-        trailing: const Icon(Icons.open_in_new, size: 18),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
         onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => TelaWebView(url: material.url, titulo: material.titulo)));
+           Navigator.push(context, MaterialPageRoute(builder: (_) => TelaWebView(url: material.url, titulo: material.titulo)));
         },
       ),
     );

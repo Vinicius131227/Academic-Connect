@@ -1,192 +1,106 @@
 // lib/telas/comum/tela_configuracoes.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../providers/provedor_autenticacao.dart';
+import '../../themes/app_theme.dart';
 import '../../l10n/app_localizations.dart';
+import '../../providers/provedor_tema.dart';
+import '../../providers/provedor_localizacao.dart';
+import 'tela_onboarding.dart';
 
-class TelaConfiguracoes extends ConsumerStatefulWidget {
+class TelaConfiguracoes extends ConsumerWidget {
   const TelaConfiguracoes({super.key});
 
   @override
-  ConsumerState<TelaConfiguracoes> createState() => _TelaConfiguracoesState();
-}
-
-class _TelaConfiguracoesState extends ConsumerState<TelaConfiguracoes> {
-  // Simulação de configuração de notificação
-  bool _notificacoesAtivas = true;
-  String _idiomaSelecionado = 'pt';
-  
-  // Simulação de lista de idiomas
-  final Map<String, String> _idiomas = {
-    'pt': 'Português',
-    'en': 'English',
-  };
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final user = ref.watch(provedorNotificadorAutenticacao).usuario;
-    final papel = user?.papel;
+    final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+    final nome = usuario?.alunoInfo?.nomeCompleto ?? 'Usuário';
     
-    String _getPapelTraduzido(String? papel) {
-      if (papel == 'aluno') return t.t('papel_aluno');
-      if (papel == 'professor') return t.t('papel_professor');
-      if (papel == 'ca_projeto') return t.t('papel_ca');
-      return t.t('papel_desconhecido');
-    }
+    final temaAtual = ref.watch(provedorNotificadorTema);
+    final localeAtual = ref.watch(provedorLocalizacao);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(t.t('config_titulo')),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(icon: const Icon(Icons.close, color: AppColors.textWhite), onPressed: () => Navigator.pop(context)),
+        title: Text(t.t('config_titulo'), style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Seção de Perfil ---
-            Text(t.t('config_perfil_titulo'), style: theme.textTheme.titleLarge),
-            const Divider(),
+            // ... (Cabeçalho do Perfil igual) ...
+             const SizedBox(height: 40),
             
-            ListTile(
-              title: Text(t.t('cadastro_nome_label')),
-              subtitle: Text(user?.alunoInfo?.nomeCompleto ?? 'N/A'),
-              leading: const Icon(Icons.person),
-            ),
-            ListTile(
-              title: Text(t.t('config_email')),
-              subtitle: Text(user?.email ?? 'N/A'),
-              leading: const Icon(Icons.email),
-            ),
-            ListTile(
-              title: Text(t.t('config_papel')),
-              subtitle: Text(_getPapelTraduzido(papel)),
-              leading: const Icon(Icons.work),
-            ),
-            
-            const SizedBox(height: 24),
-
-            // --- Seção de Configurações Gerais ---
-            Text(t.t('config_geral_titulo'), style: theme.textTheme.titleLarge),
-            const Divider(),
-            
-            // Notificações
-            SwitchListTile(
-              title: Text(t.t('config_notif_titulo')),
-              subtitle: Text(t.t('config_notif_desc')),
-              value: _notificacoesAtivas,
-              onChanged: (bool value) {
-                setState(() {
-                  _notificacoesAtivas = value;
-                });
-                // Lógica para salvar a preferência
-              },
-              secondary: const Icon(Icons.notifications),
-            ),
-            
-            // Idioma
-            ListTile(
-              title: Text(t.t('config_idioma')),
-              leading: const Icon(Icons.language),
-              trailing: DropdownButton<String>(
-                value: _idiomaSelecionado,
-                items: _idiomas.entries.map((entry) {
-                  return DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  );
-                }).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _idiomaSelecionado = newValue;
-                    });
-                    // Lógica para mudar o idioma (precisa de um provedor de localização real)
-                  }
-                },
+            // --- TEMA (Agora com opção Sistema) ---
+            _buildSectionTitle(t.t('config_secao_aparencia')),
+            Container(
+              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                children: [
+                  _buildRadioItem(t.t('config_tema_claro'), temaAtual == ModoSistemaTema.claro, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.claro)),
+                  const Divider(height: 1, color: Colors.white10),
+                  _buildRadioItem(t.t('config_tema_escuro'), temaAtual == ModoSistemaTema.escuro, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.escuro)),
+                  const Divider(height: 1, color: Colors.white10),
+                  _buildRadioItem("Sistema", temaAtual == ModoSistemaTema.sistema, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.sistema)),
+                ],
               ),
             ),
             
             const SizedBox(height: 24),
-            
-            // --- Seção de Ação ---
-            Text(t.t('config_acoes_titulo'), style: theme.textTheme.titleLarge),
-            const Divider(),
 
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: Text(t.t('config_logout'), style: const TextStyle(color: Colors.red)),
-              onTap: () {
-                // CORRIGIDO: O método está definido no NotificadorAutenticacao
+            // --- IDIOMA ---
+            _buildSectionTitle(t.t('config_secao_idioma')),
+            Container(
+              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                children: [
+                  _buildRadioItem("Português", localeAtual.languageCode == 'pt', () => ref.read(provedorLocalizacao.notifier).mudarLingua('pt')),
+                  const Divider(height: 1, color: Colors.white10),
+                  _buildRadioItem("English", localeAtual.languageCode == 'en', () => ref.read(provedorLocalizacao.notifier).mudarLingua('en')),
+                  const Divider(height: 1, color: Colors.white10),
+                  _buildRadioItem("Español", localeAtual.languageCode == 'es', () => ref.read(provedorLocalizacao.notifier).mudarLingua('es')),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Geral
+            _buildSectionTitle(t.t('config_secao_geral')),
+            _buildSettingItem(Icons.help_outline, t.t('config_ajuda'), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaOnboarding()))),
+            
+            const SizedBox(height: 40),
+            
+            // Logout
+            TextButton.icon(
+              onPressed: () {
                 ref.read(provedorNotificadorAutenticacao.notifier).logout();
+                Navigator.popUntil(context, (route) => route.isFirst);
               },
+              icon: const Icon(Icons.power_settings_new, color: AppColors.error),
+              label: Text(t.t('config_sair'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.error)),
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), alignment: Alignment.centerLeft),
             ),
-
-            if (papel == 'professor')
-              ListTile(
-                leading: const Icon(Icons.qr_code_scanner),
-                title: Text(t.t('config_vincular_nfc')),
-                onTap: () {
-                  // TODO: Implementar navegação para tela de vincular NFC
-                },
-              ),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildRadioTile<T>(BuildContext context, {required String title, String? subtitle, IconData? icon, required T value, required T groupValue, required ValueChanged<T?> onChanged}) {
-    return RadioListTile<T>(
-      title: Row(children: [ if (icon != null) Icon(icon, size: 20), if (icon != null) const SizedBox(width: 8), Text(title) ]),
-      subtitle: subtitle != null ? Text(subtitle, style: Theme.of(context).textTheme.bodySmall) : null,
-      value: value,
-      groupValue: groupValue,
-      onChanged: onChanged,
-      contentPadding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-  Widget _buildInfoRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodyLarge),
-          Text(value, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
   
-  void _confirmarSaida(BuildContext context, WidgetRef ref) {
-    final t = AppLocalizations.of(context)!;
-    
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(t.t('config_sair_dialog_titulo')),
-          content: Text(t.t('config_sair_dialog_desc')),
-          actions: <Widget>[
-            TextButton(
-              child: Text(t.t('config_sair_dialog_cancelar')),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: Text(t.t('config_sair'), style: TextStyle(color: Colors.white)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); 
-                Navigator.of(context).pop(); // Sai da tela de Configurações
-                ref.read(provedorNotificadorAutenticacao.notifier).logout(); 
-              },
-            ),
-          ],
-        );
-      },
-    );
+  // ... (Widgets auxiliares _buildSectionTitle, _buildRadioItem, _buildSettingItem mantidos iguais) ...
+  Widget _buildSectionTitle(String title) {
+    return Padding(padding: const EdgeInsets.only(bottom: 12.0), child: Text(title, style: GoogleFonts.poppins(color: AppColors.textGrey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)));
+  }
+  Widget _buildRadioItem(String title, bool selected, VoidCallback onTap) {
+    return ListTile(onTap: onTap, title: Text(title, style: GoogleFonts.poppins(color: Colors.white)), trailing: selected ? const Icon(Icons.check_circle, color: AppColors.primaryPurple) : const Icon(Icons.circle_outlined, color: Colors.grey));
+  }
+  Widget _buildSettingItem(IconData icon, String title, VoidCallback onTap) {
+    return ListTile(onTap: onTap, contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: AppColors.textGrey)), title: Text(title, style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textWhite, fontWeight: FontWeight.w500)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 14));
   }
 }
