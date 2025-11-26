@@ -12,7 +12,7 @@ import 'tela_drive_provas.dart';
 import 'tela_dicas_gerais.dart'; 
 import 'tela_calendario.dart';   
 import '../../l10n/app_localizations.dart';
-import '../../themes/app_theme.dart'; // ÚNICA FONTE DE CORES
+import '../../themes/app_theme.dart'; // Importe apenas este
 import '../comum/animacao_fadein_lista.dart'; 
 import '../comum/widget_carregamento.dart';
 import 'package:http/http.dart' as http; 
@@ -38,24 +38,25 @@ class AbaInicioAluno extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final asyncProvas = ref.watch(provedorStreamCalendario); 
-    final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
-    final nomeAluno = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Aluno';
-    final cr = usuario?.alunoInfo?.cr ?? 0.0;
+    final authState = ref.watch(provedorNotificadorAutenticacao);
+    final usuario = authState.usuario;
     final asyncQuote = ref.watch(quoteProvider);
 
-    // --- LÓGICA DE TEMA ---
+    // --- PROTEÇÃO CONTRA NULOS (CORREÇÃO DO ERRO VERMELHO) ---
+    final String nomeAluno = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Estudante';
+    final double cr = usuario?.alunoInfo?.cr ?? 0.0;
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    
     final textColor = isDark ? Colors.white : Colors.black87;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
-    
-    // Cor segura para cards
-    final cardColor = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final cardColor = isDark ? const Color(0xFF2C2C2C) : Colors.white;
 
+    // Navegação
     void _abrirDriveGlobal() {
          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDriveProvas()));
     }
-    
     void _abrirDicasGerais() {
          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDicasGerais()));
     }
@@ -72,7 +73,7 @@ class AbaInicioAluno extends ConsumerWidget {
                 children: [
                   const Text("👋 ", style: TextStyle(fontSize: 24)),
                   Text(
-                    "Olá, $nomeAluno",
+                    "${t.t('inicio_ola')}, $nomeAluno",
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
                   ),
                 ],
@@ -81,7 +82,7 @@ class AbaInicioAluno extends ConsumerWidget {
               asyncQuote.when(
                 data: (frase) => SizedBox(width: 250, child: Text('"$frase"', style: TextStyle(fontSize: 12, color: subTextColor, fontStyle: FontStyle.italic), maxLines: 2, overflow: TextOverflow.ellipsis)),
                 loading: () => Text("Carregando...", style: TextStyle(fontSize: 12, color: subTextColor)),
-                error: (_, __) => Text("Vamos estudar hoje!", style: TextStyle(fontSize: 12, color: subTextColor)),
+                error: (_, __) => Text(t.t('inicio_subtitulo'), style: TextStyle(fontSize: 12, color: subTextColor)),
               ),
             ],
           ),
@@ -95,7 +96,7 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 24),
 
-      // 2. CARD DE STATUS
+      // 2. CARD DE STATUS (Laranja)
       Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
@@ -116,19 +117,19 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 32),
 
-      // 3. CATEGORIAS EM DESTAQUE
-      Text("Acesso Rápido", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+      // 3. ACESSO RÁPIDO
+      Text(t.t('inicio_acesso_rapido'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
       const SizedBox(height: 16),
       
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: _buildCategoryItem(context, icon: Icons.folder_shared_outlined, label: "Drive Provas", color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: _abrirDriveGlobal)),
+          Expanded(child: _buildCategoryItem(context, icon: Icons.folder_shared_outlined, label: t.t('card_drive'), color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: _abrirDriveGlobal)),
           const SizedBox(width: 8),
-          Expanded(child: _buildCategoryItem(context, icon: Icons.lightbulb_outline, label: "Dicas Gerais", color: const Color(0xFFE3F2FD), iconColor: Colors.blue, textColor: subTextColor, onTap: _abrirDicasGerais)),
+          Expanded(child: _buildCategoryItem(context, icon: Icons.lightbulb_outline, label: t.t('card_dicas'), color: const Color(0xFFE3F2FD), iconColor: Colors.blue, textColor: subTextColor, onTap: _abrirDicasGerais)),
           const SizedBox(width: 8),
-          Expanded(child: _buildCategoryItem(context, icon: Icons.accessibility_new, label: "Adaptação", color: const Color(0xFFF3E5F5), iconColor: Colors.purple, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSolicitarAdaptacao())))),
+          Expanded(child: _buildCategoryItem(context, icon: Icons.accessibility_new, label: t.t('card_adaptacao'), color: const Color(0xFFF3E5F5), iconColor: Colors.purple, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSolicitarAdaptacao())))),
           const SizedBox(width: 8),
           Expanded(child: _buildCategoryItem(context, icon: Icons.calendar_month, label: "Calendário", color: const Color(0xFFE8F5E9), iconColor: Colors.green, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCalendario())))),
         ],
@@ -137,7 +138,7 @@ class AbaInicioAluno extends ConsumerWidget {
       const SizedBox(height: 32),
 
       // 4. LISTA RECENTE
-      Text("Próximas Avaliações", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+      Text(t.t('inicio_proximas_avaliacoes'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
       const SizedBox(height: 16),
 
       asyncProvas.when(
@@ -148,7 +149,7 @@ class AbaInicioAluno extends ConsumerWidget {
             return Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
-              child: Center(child: Text("Sem provas agendadas.", style: TextStyle(color: subTextColor))),
+              child: Center(child: Text(t.t('inicio_sem_provas'), style: TextStyle(color: subTextColor))),
             );
           }
           return Column(children: provas.take(3).map((prova) => _buildResultCard(prova, cardColor, textColor, subTextColor)).toList());
@@ -157,19 +158,20 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 30),
       
+      // Botão Sincronizar
       SizedBox(
         width: double.infinity,
         height: 50,
         child: ElevatedButton(
           onPressed: () {
-             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Dados sincronizados com sucesso!")));
+             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.t('inicio_btn_sincronizar'))));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primaryPurple,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
-          child: const Text("Sincronizar Dados", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: Text(t.t('inicio_btn_sincronizar'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ),
       ),
       const SizedBox(height: 80),
