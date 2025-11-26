@@ -17,6 +17,7 @@ import '../models/evento_ca.dart';
 import '../models/mensagem_chat.dart';
 import '../models/material_aula.dart';
 import '../models/dica_aluno.dart';
+import '../models/atividade_evento.dart'; 
 
 class ServicoFirestore {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -53,9 +54,10 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 2. MÉTODOS DE CONSULTA E LEITURA
+  // 2. MÉTODOS DE CONSULTA E LEITURA (Auxiliares)
   // ===========================================================================
 
+  /// Busca aluno por cartão NFC (Usado na chamada presencial)
   Future<UsuarioApp?> getAlunoPorNFC(String nfcId) async {
     final query = await _db
         .collection('usuarios')
@@ -68,6 +70,7 @@ class ServicoFirestore {
     return UsuarioApp.fromSnapshot(query.docs.first as DocumentSnapshot<Map<String, dynamic>>);
   }
 
+  /// Busca lista de alunos para chamada manual e gestão
   Future<List<AlunoChamada>> getAlunosDaTurma(String turmaId) async {
     final turmaDoc = await _db.collection('turmas').doc(turmaId).get();
     if (!turmaDoc.exists) return [];
@@ -94,6 +97,7 @@ class ServicoFirestore {
     return alunos;
   }
   
+  /// Retorna dados da aula de um dia específico (para validação de presença retroativa)
   Future<Map<String, dynamic>?> getAulaPorDia(String turmaId, DateTime data) async {
     final dataString = DateFormat('yyyy-MM-dd').format(data);
     final doc = await _db
@@ -107,9 +111,10 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 3. STREAMS (Fluxos de Dados)
+  // 3. STREAMS (Fluxos de Dados em Tempo Real)
   // ===========================================================================
 
+  // --- PROFESSOR ---
   Stream<List<TurmaProfessor>> getTurmasProfessor(String professorUid) {
     return _db
         .collection('turmas')
@@ -130,6 +135,7 @@ class ServicoFirestore {
             .toList());
   }
   
+  // --- ALUNO ---
   Stream<List<TurmaProfessor>> getTurmasAluno(String alunoUid) {
     return _db
         .collection('turmas')
@@ -170,6 +176,7 @@ class ServicoFirestore {
         .snapshots();
   }
   
+  // --- GERAIS ---
   Stream<List<ProvaAgendada>> getCalendarioDeProvas() {
     return _db
         .collection('provas') 
@@ -191,10 +198,10 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 4. HUB DA DISCIPLINA E GLOBAIS
+  // 4. HUB DA DISCIPLINA (Chat, Materiais, Dicas)
   // ===========================================================================
 
-  // CHAT
+  // --- CHAT ---
   Stream<List<MensagemChat>> getStreamMensagens(String turmaId) {
     return _db
         .collection('turmas')
@@ -215,7 +222,7 @@ class ServicoFirestore {
         .add(mensagem.toMap());
   }
 
-  // MATERIAIS
+  // --- MATERIAIS ---
   Stream<List<MaterialAula>> getStreamMateriais(String turmaId) {
     return _db
         .collection('turmas')
@@ -239,10 +246,10 @@ class ServicoFirestore {
             .toList());
   }
 
-  // (NOVO) Buscar TODAS as provas (para o Drive Global)
+  // DRIVE GLOBAL: Busca todas as provas de todas as matérias
   Stream<List<MaterialAula>> getTodosMateriaisTipoProva() {
     return _db.collectionGroup('materiais')
-        .where('tipo', isEqualTo: 'prova') // Filtra só provas
+        .where('tipo', isEqualTo: 'prova') 
         .orderBy('dataPostagem', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => MaterialAula.fromMap(d.data(), d.id)).toList());
@@ -267,7 +274,7 @@ class ServicoFirestore {
         .delete();
   }
 
-  // DICAS
+  // --- DICAS ---
   Stream<List<DicaAluno>> getStreamDicas(String turmaId) {
     return _db
         .collection('turmas')
@@ -291,7 +298,7 @@ class ServicoFirestore {
             .toList());
   }
 
-  // (NOVO) Buscar TODAS as dicas (para Dicas Gerais)
+  // DICAS GERAIS: Busca todas as dicas do sistema
   Stream<List<DicaAluno>> getTodasDicasGlobais() {
     return _db.collectionGroup('dicas')
         .orderBy('dataPostagem', descending: true)
@@ -310,9 +317,10 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 5. GESTÃO E ESCRITA
+  // 5. GESTÃO, CSV E ESCRITA
   // ===========================================================================
 
+  // SUGESTÕES
   Future<void> enviarSugestao(String texto, String autorId) async {
     await _db.collection('sugestoes').add({
       'texto': texto,
@@ -321,6 +329,7 @@ class ServicoFirestore {
     });
   }
 
+  // HISTÓRICO DE CHAMADAS
   Stream<List<String>> getDatasChamadas(String turmaId) {
     return _db
         .collection('turmas')
@@ -341,6 +350,89 @@ class ServicoFirestore {
       'presentes_fim': presentesFim,
     });
   }
+
+  // GERAÇÃO DE PLANILHA (CSV) - TURMA
+  Future<String> gerarPlanilhaTurma(String turmaId) async {
+    // 1. Pega alunos inscritos
+    final alunosDoc = await _db.collection('turmas').doc(turmaId).get();
+    final List<String> alunoUids = List<String>.from(alunosDoc.data()!['alunosInscritos'] ?? []);
+    
+    Map<String, String> nomesAlunos = {};
+    for (var uid in alunoUids) {
+      final u = await getUsuario(uid);
+      nomesAlunos[uid] = u?.alunoInfo?.nomeCompleto ?? 'Desconhecido';
+    }
+
+    // 2. Pega os dias de aula
+    final aulasSnapshot = await _db.collection('turmas').doc(turmaId).collection('aulas').orderBy('data').get();
+    
+    // Cabeçalho CSV
+    String csv = "\uFEFFNome do Aluno"; // \uFEFF é o BOM para Excel reconhecer UTF-8
+    List<String> datas = [];
+    for (var doc in aulasSnapshot.docs) {
+       DateTime dataAula = (doc.data()['data'] as Timestamp).toDate();
+       String dataFormatada = DateFormat('dd/MM').format(dataAula);
+       datas.add(doc.id); // ID é a data
+       csv += ";$dataFormatada"; // Ponto e vírgula é melhor para Excel no Brasil
+    }
+    csv += "\n";
+
+    // Linhas (Alunos)
+    for (var uid in alunoUids) {
+      csv += "${nomesAlunos[uid]}";
+      for (var data in datas) {
+        final aulaDoc = aulasSnapshot.docs.firstWhere((d) => d.id == data);
+        final dadosAula = aulaDoc.data();
+        final presentes = List<String>.from(dadosAula['presentes_inicio'] ?? []) + List<String>.from(dadosAula['presentes_fim'] ?? []);
+        
+        csv += presentes.contains(uid) ? ";P" : ";F";
+      }
+      csv += "\n";
+    }
+    return csv;
+  }
+
+  // --- ATIVIDADES DO CA ---
+  Stream<List<AtividadeEvento>> getAtividadesEvento(String eventoId) {
+    return _db.collection('eventos').doc(eventoId).collection('atividades')
+      .orderBy('dataHora').snapshots()
+      .map((s) => s.docs.map((d) => AtividadeEvento.fromMap(d.data(), d.id)).toList());
+  }
+
+  Future<void> criarAtividadeEvento(String eventoId, String nome, DateTime data, String local) async {
+    await _db.collection('eventos').doc(eventoId).collection('atividades').add({
+      'nome': nome,
+      'dataHora': Timestamp.fromDate(data),
+      'local': local,
+      'presentes': [],
+    });
+  }
+
+  Future<void> registrarPresencaAtividade(String eventoId, String atividadeId, List<String> uids) async {
+    await _db.collection('eventos').doc(eventoId).collection('atividades').doc(atividadeId).update({
+      'presentes': FieldValue.arrayUnion(uids),
+    });
+  }
+
+  // GERAÇÃO DE PLANILHA (CSV) - EVENTO CA
+  Future<String> gerarPlanilhaEvento(String eventoId) async {
+    final atividades = await _db.collection('eventos').doc(eventoId).collection('atividades').get();
+    
+    String csv = "\uFEFFAtividade;Participante;RA\n";
+
+    for (var ativ in atividades.docs) {
+      final nomeAtiv = ativ.data()['nome'];
+      final presentes = List<String>.from(ativ.data()['presentes'] ?? []);
+      
+      for (var uid in presentes) {
+        final u = await getUsuario(uid);
+        csv += "\"$nomeAtiv\";\"${u?.alunoInfo?.nomeCompleto}\";\"${u?.alunoInfo?.ra}\"\n";
+      }
+    }
+    return csv;
+  }
+
+  // --- MÉTODOS DE ESCRITA GERAIS ---
 
   Future<void> atualizarSolicitacao(String solicitacaoId, StatusSolicitacao novoStatus, String resposta) async {
     await _db.collection('solicitacoes').doc(solicitacaoId).update({
@@ -369,6 +461,7 @@ class ServicoFirestore {
     
     final dadosTurma = turma.toMap();
     dadosTurma['turmaCode'] = codigo;
+    dadosTurma['linkConvite'] = "academicconnect://entrar/$codigo";
 
     final docRef = await _db.collection('turmas').add(dadosTurma);
     await docRef.update({'id': docRef.id}); 
@@ -533,25 +626,22 @@ final servicoFirestoreProvider = Provider<ServicoFirestore>((ref) {
   return ServicoFirestore();
 });
 
-// Chat
+// Hub
 final streamMensagensProvider =
     StreamProvider.family<List<MensagemChat>, String>((ref, turmaId) {
   return ref.watch(servicoFirestoreProvider).getStreamMensagens(turmaId);
 });
 
-// Materiais da Turma
 final streamMateriaisProvider =
     StreamProvider.family<List<MaterialAula>, String>((ref, turmaId) {
   return ref.watch(servicoFirestoreProvider).getStreamMateriais(turmaId);
 });
 
-// Dicas da Turma
 final streamDicasProvider =
     StreamProvider.family<List<DicaAluno>, String>((ref, turmaId) {
   return ref.watch(servicoFirestoreProvider).getStreamDicas(turmaId);
 });
 
-// Materiais Antigos / Drive Global
 final streamMateriaisAntigosProvider =
     StreamProvider.family<List<MaterialAula>, String>((ref, nomeBase) {
   return ref.watch(servicoFirestoreProvider).getMateriaisPorNomeBase(nomeBase);
@@ -561,7 +651,6 @@ final driveProvasProvider = StreamProvider<List<MaterialAula>>((ref) {
   return ref.watch(servicoFirestoreProvider).getTodosMateriaisTipoProva();
 });
 
-// Dicas por Nome / Dicas Gerais
 final streamDicasPorNomeProvider =
     StreamProvider.family<List<DicaAluno>, String>((ref, nomeBase) {
   return ref.watch(servicoFirestoreProvider).getDicasPorNomeBase(nomeBase);

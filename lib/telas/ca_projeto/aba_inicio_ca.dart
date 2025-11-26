@@ -1,16 +1,19 @@
-// lib/telas/ca_projeto/aba_inicio_ca.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/provedor_ca.dart';
-import '../../providers/provedores_app.dart';
-import 'tela_presenca_evento.dart';
-import 'tela_criar_evento.dart';
-import '../comum/animacao_fadein_lista.dart'; 
-import '../../l10n/app_localizations.dart'; 
-import '../../themes/app_theme.dart'; // Cores
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+
+import '../../providers/provedor_ca.dart'; // Para as funções específicas do CA (se houver)
+import '../../providers/provedores_app.dart'; // Para o stream de eventos
 import '../../providers/provedor_autenticacao.dart';
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
+import '../comum/widget_carregamento.dart';
+import '../comum/animacao_fadein_lista.dart';
+
+// Telas de ação
+import 'tela_criar_evento.dart';
+import 'tela_presenca_evento.dart';
 
 class AbaInicioCA extends ConsumerWidget {
   const AbaInicioCA({super.key});
@@ -22,156 +25,206 @@ class AbaInicioCA extends ConsumerWidget {
     final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
     final nomeCA = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Gestão';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. CABEÇALHO
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text("📢 ", style: TextStyle(fontSize: 24)),
-                        Text(
-                          "Olá, $nomeCA",
-                          style: GoogleFonts.poppins(
-                            fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textWhite
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Gerencie os eventos do campus.",
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textGrey),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-                  child: const Icon(Icons.campaign, color: Colors.white),
-                ),
-              ],
-            ),
+    // --- LÓGICA DE TEMA ---
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Cores dinâmicas
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+    final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
+    final Color cardBgColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final Color borderColor = isDark ? Colors.white10 : Colors.black12;
 
-            const SizedBox(height: 24),
-
-            // 2. CARD DE STATUS (Laranja/Roxo)
-            asyncEventos.when(
-              data: (eventos) {
-                final totalInscritos = eventos.fold(0, (sum, e) => sum + e.totalParticipantes);
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF8A65), Color(0xFFFF7043)], 
-                      begin: Alignment.topLeft, end: Alignment.bottomRight
+    final widgets = [
+      // 1. CABEÇALHO
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text("📢 ", style: TextStyle(fontSize: 24)),
+                  Text(
+                    "Olá, $nomeCA",
+                    style: GoogleFonts.poppins(
+                      fontSize: 24, 
+                      fontWeight: FontWeight.bold, 
+                      color: textColor
                     ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(color: const Color(0xFFFF7043).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
-                    ],
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatusItem(icon: Icons.event_available, value: eventos.length.toString(), label: "Eventos Ativos"),
-                      Container(width: 1, height: 40, color: Colors.white30),
-                      _buildStatusItem(icon: Icons.groups, value: totalInscritos.toString(), label: "Participantes"),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-              error: (_,__) => const SizedBox.shrink(),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Gerencie os eventos do campus.",
+                style: GoogleFonts.poppins(fontSize: 14, color: subTextColor),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cardBgColor, 
+              shape: BoxShape.circle
             ),
-
-            const SizedBox(height: 32),
-
-            // 3. ATALHOS RÁPIDOS
-            Text("Ações Rápidas", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildCategoryItem(
-                  icon: Icons.add_box_outlined,
-                  label: "Criar Evento",
-                  color: const Color(0xFFE3F2FD), // Azul claro
-                  iconColor: Colors.blue,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarEvento())),
-                ),
-                _buildCategoryItem(
-                  icon: Icons.qr_code_scanner,
-                  label: "Ler Presença",
-                  color: const Color(0xFFE8F5E9), // Verde claro
-                  iconColor: Colors.green,
-                  onTap: () {
-                     // Pega o primeiro evento para demo ou abre lista
-                     asyncEventos.whenData((eventos) {
-                        if (eventos.isNotEmpty) {
-                           Navigator.push(context, MaterialPageRoute(builder: (_) => TelaPresencaEvento(evento: eventos.first)));
-                        } else {
-                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nenhum evento para ler.")));
-                        }
-                     });
-                  },
-                ),
-                _buildCategoryItem(
-                  icon: Icons.email_outlined,
-                  label: "Comunicado",
-                  color: const Color(0xFFFFF3E0), // Laranja claro
-                  iconColor: Colors.orange,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Envio de e-mail em massa (via Firebase).")));
-                  },
-                ),
-                _buildCategoryItem(
-                  icon: Icons.analytics_outlined,
-                  label: "Relatórios",
-                  color: const Color(0xFFF3E5F5), // Roxo claro
-                  iconColor: Colors.purple,
-                  onTap: () {},
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 32),
-
-            // 4. PRÓXIMOS EVENTOS (Lista)
-            Text("Próximos Eventos", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 16),
-
-            asyncEventos.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e,s) => const Text("Erro ao carregar"),
-              data: (eventos) {
-                if (eventos.isEmpty) {
-                  return Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
-                    child: const Center(child: Text("Nenhum evento agendado.", style: TextStyle(color: Colors.grey))),
-                  );
-                }
-                return Column(
-                  children: eventos.take(3).map((evento) => _buildEventCard(evento)).toList(),
-                );
-              },
-            ),
-            
-            const SizedBox(height: 80),
-          ],
-        ),
+            child: Icon(Icons.campaign, color: textColor),
+          ),
+        ],
       ),
+
+      const SizedBox(height: 24),
+
+      // 2. CARD DE STATUS (Laranja/Roxo - Destaque)
+      asyncEventos.when(
+        data: (eventos) {
+          final totalInscritos = eventos.fold(0, (sum, e) => sum + e.totalParticipantes);
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF8A65), Color(0xFFFF7043)], // Laranja Vibrante
+                begin: Alignment.topLeft, 
+                end: Alignment.bottomRight
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF7043).withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6)
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatusItem(
+                  icon: Icons.event_available, 
+                  value: eventos.length.toString(), 
+                  label: "Eventos Ativos"
+                ),
+                Container(width: 1, height: 40, color: Colors.white30),
+                _buildStatusItem(
+                  icon: Icons.groups, 
+                  value: totalInscritos.toString(), 
+                  label: "Participantes"
+                ),
+              ],
+            ),
+          );
+        },
+        loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
+        error: (_,__) => const SizedBox.shrink(),
+      ),
+
+      const SizedBox(height: 32),
+
+      // 3. AÇÕES RÁPIDAS (Grid de Botões)
+      Text(
+        "Gestão de Eventos", 
+        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
+      ),
+      const SizedBox(height: 16),
+      
+      Row(
+        children: [
+          Expanded(
+            child: _buildCategoryItem(
+              context,
+              icon: Icons.add_box_outlined,
+              label: "Criar Evento",
+              color: const Color(0xFFE3F2FD), // Azul claro
+              iconColor: Colors.blue,
+              textColor: subTextColor,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarEvento())),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildCategoryItem(
+              context,
+              icon: Icons.qr_code_scanner,
+              label: "Ler Presença",
+              color: const Color(0xFFE8F5E9), // Verde claro
+              iconColor: Colors.green,
+              textColor: subTextColor,
+              onTap: () {
+                 // Pega o primeiro evento para demo ou abre lista de seleção
+                 asyncEventos.whenData((eventos) {
+                    if (eventos.isNotEmpty) {
+                       // Idealmente abriria um diálogo para escolher qual evento
+                       // Para o MVP, pegamos o primeiro ou o mais recente
+                       Navigator.push(context, MaterialPageRoute(builder: (_) => TelaPresencaEvento(evento: eventos.first)));
+                    } else {
+                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nenhum evento criado.")));
+                    }
+                 });
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildCategoryItem(
+              context,
+              icon: Icons.email_outlined,
+              label: "Comunicado",
+              color: const Color(0xFFFFF3E0), // Laranja claro
+              iconColor: Colors.orange,
+              textColor: subTextColor,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Envio de e-mail em massa (Simulado).")));
+              },
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 32),
+
+      // 4. PRÓXIMOS EVENTOS (Lista)
+      Text(
+        "Calendário de Eventos", 
+        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
+      ),
+      const SizedBox(height: 16),
+
+      asyncEventos.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e,s) => const SizedBox.shrink(),
+        data: (eventos) {
+          if (eventos.isEmpty) {
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: cardBgColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Center(
+                child: Text("Nenhum evento agendado.", style: TextStyle(color: subTextColor))
+              ),
+            );
+          }
+          // Ordena por data
+          eventos.sort((a, b) => a.data.compareTo(b.data));
+          
+          return Column(
+            children: eventos.take(5).map((evento) => 
+              _buildEventCard(context, evento, cardBgColor, borderColor, textColor)
+            ).toList(),
+          );
+        },
+      ),
+      
+      const SizedBox(height: 80),
+    ];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+      child: FadeInListAnimation(children: widgets),
     );
   }
 
@@ -180,7 +233,10 @@ class AbaInicioCA extends ConsumerWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            shape: BoxShape.circle
+          ),
           child: Icon(icon, color: Colors.white, size: 24),
         ),
         const SizedBox(width: 12),
@@ -195,7 +251,13 @@ class AbaInicioCA extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategoryItem({required IconData icon, required String label, required Color color, required Color iconColor, required VoidCallback onTap}) {
+  Widget _buildCategoryItem(BuildContext context, {
+      required IconData icon, 
+      required String label, 
+      required Color color, 
+      required Color iconColor, 
+      required Color textColor, 
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -209,32 +271,45 @@ class AbaInicioCA extends ConsumerWidget {
             child: Icon(icon, color: iconColor, size: 28),
           ),
           const SizedBox(height: 8),
-          Text(label, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(
+            label, 
+            style: GoogleFonts.poppins(color: textColor, fontSize: 12, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildEventCard(evento) {
+  Widget _buildEventCard(BuildContext context, dynamic evento, Color bgColor, Color borderColor, Color textColor) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: bgColor,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primaryPurple.withOpacity(0.2),
+              color: AppColors.primaryPurple.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               children: [
-                Text(DateFormat('dd').format(evento.data), style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 18)),
-                Text(DateFormat('MMM').format(evento.data), style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontSize: 12)),
+                Text(
+                  DateFormat('dd').format(evento.data), 
+                  style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 18)
+                ),
+                Text(
+                  DateFormat('MMM').format(evento.data), 
+                  style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontSize: 12)
+                ),
               ],
             ),
           ),
@@ -243,13 +318,23 @@ class AbaInicioCA extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(evento.nome, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  evento.nome, 
+                  style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)
+                ),
                 const SizedBox(height: 4),
-                Text(evento.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const SizedBox(width: 4),
+                    Text(evento.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
               ],
             ),
           ),
-          const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+          // Ícone de seta ou menu
+          const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
         ],
       ),
     );

@@ -1,77 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:intl/date_symbol_data_local.dart';
-import 'l10n/app_localizations.dart';
-import 'themes/app_theme.dart';
-import 'telas/login/portao_autenticacao.dart';
-import 'telas/comum/tela_onboarding.dart';
-import 'providers/provedor_localizacao.dart';
-import 'providers/provedor_tema.dart';
-import 'servico_preferencias.dart';
-import 'providers/provedor_onboarding.dart';
-import 'telas/comum/overlay_carregamento.dart';
-import 'telas/comum/widget_carregamento.dart';
-
-// --- Imports do Firebase (Corretos) ---
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; 
+import 'firebase_options.dart'; // Certifique-se de que este arquivo existe (gerado pelo flutterfire configure)
+import 'telas/login/portao_autenticacao.dart';
+import 'servico_preferencias.dart';
+import 'themes/app_theme.dart';
+import 'providers/provedor_tema.dart';
+import 'providers/provedor_localizacao.dart';
+import 'l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // --- Inicializa o Firebase ---
+  // 1. Inicializa o Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  await initializeDateFormatting('pt_BR', null); 
-  
-  final servicoPreferencias = ServicoPreferencias();
-  await servicoPreferencias.init();
-  
+  // 2. Inicializa as Preferências (Tema, Idioma, Onboarding)
+  final prefs = ServicoPreferencias();
+  await prefs.init();
+
+  // 3. Inicia o App com o Escopo do Riverpod
   runApp(
     ProviderScope(
       overrides: [
-        provedorPreferencias.overrideWithValue(servicoPreferencias),
+        // Injeta a instância de preferências carregada
+        provedorPreferencias.overrideWithValue(prefs),
       ],
-      child: const MyApp(),
+      child: const AcademicConnectApp(),
     ),
   );
 }
 
-class MyApp extends ConsumerWidget {
-  const MyApp({super.key});
+class AcademicConnectApp extends ConsumerWidget {
+  const AcademicConnectApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(provedorBrightness);
-    final locale = ref.watch(provedorLocalizacao); 
-    final isFirstLaunch = ref.watch(provedorOnboarding);
+    // Ouve as mudanças de estado (Tema e Idioma)
+    final modoTema = ref.watch(provedorNotificadorTema);
+    final locale = ref.watch(provedorLocalizacao);
 
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
       title: 'Academic Connect',
-      theme: AppTheme.lightTheme, 
-      darkTheme: AppTheme.darkTheme, 
-      themeMode: themeMode,
+      debugShowCheckedModeBanner: false,
       
+      // --- CONFIGURAÇÃO DE TEMA ---
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: modoTema == ModoSistemaTema.claro 
+          ? ThemeMode.light 
+          : (modoTema == ModoSistemaTema.escuro ? ThemeMode.dark : ThemeMode.system),
+
+      // --- CONFIGURAÇÃO DE IDIOMA ---
       locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      
-      builder: (context, child) {
-        return OverlayCarregamento(
-          child: child ?? const TelaCarregamento(),
-        );
-      },
-      
-      home: isFirstLaunch ? const TelaOnboarding() : const PortaoAutenticacao(),
+
+      // --- TELA INICIAL (Portão decide se vai p/ Login ou Home) ---
+      home: const PortaoAutenticacao(),
     );
   }
 }

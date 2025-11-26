@@ -1,4 +1,3 @@
-// lib/telas/aluno/aba_perfil_aluno.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +6,7 @@ import '../../providers/provedor_autenticacao.dart';
 import '../../themes/app_theme.dart';
 import 'tela_editar_perfil.dart';
 import 'tela_sugestoes.dart';
+import '../comum/tela_configuracoes.dart'; 
 import '../../l10n/app_localizations.dart';
 
 class AbaPerfilAluno extends ConsumerWidget {
@@ -14,12 +14,16 @@ class AbaPerfilAluno extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context)!;
     final authState = ref.watch(provedorNotificadorAutenticacao);
     final usuario = authState.usuario;
-    
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = theme.textTheme.bodyLarge?.color;
+
     if (authState.carregando) return const Center(child: CircularProgressIndicator());
+    
     if (usuario == null || usuario.alunoInfo == null) {
-       // Fallback se não tiver dados
        return Center(
          child: ElevatedButton(
            child: const Text("Completar Cadastro"),
@@ -31,27 +35,38 @@ class AbaPerfilAluno extends ConsumerWidget {
     final info = usuario.alunoInfo!;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor, 
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings_outlined, color: textColor),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaConfiguracoes())),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-             // Foto e Nome
              Center(
                child: Column(
                  children: [
                    CircleAvatar(
                      radius: 60,
                      backgroundColor: AppColors.primaryPurple,
-                     // Imagem placeholder
-                     backgroundImage: const NetworkImage('https://i.pravatar.cc/300'),
+                     child: Text(
+                       info.nomeCompleto.isNotEmpty ? info.nomeCompleto[0].toUpperCase() : 'A',
+                       style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                     ),
                    ),
                    const SizedBox(height: 20),
                    Text(
                      info.nomeCompleto,
                      style: GoogleFonts.poppins(
-                       fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white
+                       fontSize: 24, fontWeight: FontWeight.bold, color: textColor
                      ),
                      textAlign: TextAlign.center,
                    ),
@@ -59,7 +74,7 @@ class AbaPerfilAluno extends ConsumerWidget {
                    Text(
                      usuario.email,
                      style: GoogleFonts.poppins(
-                       fontSize: 14, color: AppColors.textGrey
+                       fontSize: 14, color: isDark ? AppColors.textGrey : Colors.grey
                      ),
                    ),
                  ],
@@ -68,7 +83,6 @@ class AbaPerfilAluno extends ConsumerWidget {
 
              const SizedBox(height: 40),
 
-             // Botão de Editar (Visual igual ao "Go PRO" ou destaque)
              SizedBox(
                width: 200,
                child: ElevatedButton(
@@ -79,37 +93,35 @@ class AbaPerfilAluno extends ConsumerWidget {
                    backgroundColor: AppColors.primaryPurple,
                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                  ),
-                 child: const Text("Edit Profile"),
+                 child: Text(t.t('perfil_editar_btn'), style: const TextStyle(color: Colors.white)),
                ),
              ),
 
              const SizedBox(height: 40),
              
-             // LISTA DE DADOS (Academic Info)
              Align(
                alignment: Alignment.centerLeft,
-               child: Text("ACADEMIC INFO", style: GoogleFonts.poppins(color: AppColors.textGrey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
+               child: Text(t.t('perfil_info_academica'), style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
              ),
              const SizedBox(height: 10),
 
-             _buildInfoItem("RA (ID)", info.ra),
-             _buildInfoItem("Course", info.curso),
-             _buildInfoItem("Birth Date", info.dataNascimento != null ? DateFormat('dd/MM/yyyy').format(info.dataNascimento!) : "N/A"),
-             _buildInfoItem("Status", info.status),
-             _buildInfoItem("CR (GPA)", info.cr.toStringAsFixed(2)),
+             _buildInfoItem("RA (ID)", info.ra, textColor!),
+             _buildInfoItem(t.t('cadastro_curso_label'), info.curso, textColor),
+             _buildInfoItem(t.t('cadastro_data_nasc_label'), info.dataNascimento != null ? DateFormat('dd/MM/yyyy').format(info.dataNascimento!) : "N/A", textColor),
+             _buildInfoItem(t.t('aluno_perfil_status'), info.status, textColor),
+             _buildInfoItem(t.t('aluno_perfil_cr'), info.cr.toStringAsFixed(2), textColor),
 
              const SizedBox(height: 30),
              
-             // Botão de Sugestão
              ListTile(
                contentPadding: EdgeInsets.zero,
                leading: Container(
                  padding: const EdgeInsets.all(8),
-                 decoration: BoxDecoration(color: Colors.purple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                 decoration: BoxDecoration(color: AppColors.primaryPurple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                  child: const Icon(Icons.feedback, color: AppColors.primaryPurple),
                ),
-               title: Text("Send Feedback", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500)),
-               trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+               title: Text(t.t('perfil_sugestao_btn'), style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.w500)),
+               trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSugestoes())),
              ),
           ],
@@ -118,17 +130,17 @@ class AbaPerfilAluno extends ConsumerWidget {
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(String label, String value, Color textColor) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white10)),
+        border: Border(bottom: BorderSide(color: Colors.black12)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w500)),
-          Text(value, style: GoogleFonts.poppins(color: Colors.white70)),
+          Text(label, style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.w500)),
+          Text(value, style: GoogleFonts.poppins(color: Colors.grey)),
         ],
       ),
     );

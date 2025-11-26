@@ -1,4 +1,3 @@
-// lib/telas/login/tela_cadastro_usuario.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -156,8 +155,6 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black87;
-    
-    // CORREÇÃO: Definindo cores não-nulas (!)
     final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final Color fillColor = isDark ? AppColors.surfaceDark : Colors.white;
     final Color dropdownColor = isDark ? AppColors.surfaceDark : Colors.white;

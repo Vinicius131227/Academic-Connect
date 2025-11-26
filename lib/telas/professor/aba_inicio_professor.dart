@@ -2,14 +2,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../models/turma_professor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart';
 import '../comum/widget_carregamento.dart';
 import '../../themes/app_theme.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../comum/animacao_fadein_lista.dart';
+
+// Import das telas de ação
 import 'tela_criar_turma.dart';
+import 'tela_presenca_nfc.dart'; // Caso queira atalho direto
+import 'tela_lancar_notas.dart'; // Caso queira atalho direto
+import 'tela_detalhes_disciplina_prof.dart'; // Para abrir a turma
 
 class AbaInicioProfessor extends ConsumerWidget {
   final ValueSetter<int> onNavigateToTab;
@@ -36,8 +43,16 @@ class AbaInicioProfessor extends ConsumerWidget {
     final nomeProf = ref.watch(provedorNotificadorAutenticacao).usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Professor';
     final asyncTurmas = ref.watch(provedorStreamTurmasProfessor);
 
+    // --- LÓGICA DE TEMA ---
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.white70 : Colors.black54;
+    // Fundo dos ícones pequenos
+    final iconBgColor = isDark ? Colors.white10 : Colors.black.withOpacity(0.05);
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
         child: Column(
@@ -56,7 +71,9 @@ class AbaInicioProfessor extends ConsumerWidget {
                         Text(
                           "Olá, $nomeProf",
                           style: GoogleFonts.poppins(
-                            fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textWhite
+                            fontSize: 24, 
+                            fontWeight: FontWeight.bold, 
+                            color: textColor
                           ),
                         ),
                       ],
@@ -64,21 +81,24 @@ class AbaInicioProfessor extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       "Gestão de Aulas",
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textGrey),
+                      style: GoogleFonts.poppins(fontSize: 14, color: subTextColor),
                     ),
                   ],
                 ),
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle),
-                  child: const Icon(Icons.school, color: Colors.white),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : Colors.white, 
+                    shape: BoxShape.circle
+                  ),
+                  child: Icon(Icons.school, color: textColor),
                 ),
               ],
             ),
 
             const SizedBox(height: 24),
 
-            // 2. CARD DE STATUS (Roxo/Azul)
+            // 2. CARD DE STATUS (Gradiente Roxo - Identidade Visual)
             asyncTurmas.when(
               data: (turmas) {
                 final totalAlunos = turmas.fold(0, (sum, t) => sum + t.alunosInscritos.length);
@@ -112,46 +132,26 @@ class AbaInicioProfessor extends ConsumerWidget {
             const SizedBox(height: 32),
 
             // 3. ATALHOS RÁPIDOS
-            Text("Acesso Rápido", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text("Acesso Rápido", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildCategoryItem(
-                  icon: Icons.add_circle_outline,
-                  label: "Criar Turma",
-                  color: const Color(0xFFE3F2FD),
-                  iconColor: Colors.blue,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarTurma())),
-                ),
-                _buildCategoryItem(
-                  icon: Icons.nfc,
-                  label: "Chamada NFC",
-                  color: const Color(0xFFE8F5E9),
-                  iconColor: Colors.green,
-                  onTap: () => onNavigateToTab(1), // Vai para aba de turmas
-                ),
-                _buildCategoryItem(
-                  icon: Icons.list_alt,
-                  label: "Manual",
-                  color: const Color(0xFFFFF3E0),
-                  iconColor: Colors.orange,
-                  onTap: () => onNavigateToTab(1),
-                ),
-                _buildCategoryItem(
-                  icon: Icons.grade,
-                  label: "Notas",
-                  color: const Color(0xFFF3E5F5),
-                  iconColor: Colors.purple,
-                  onTap: () => onNavigateToTab(1),
-                ),
+                Expanded(child: _buildCategoryItem(context, icon: Icons.add_circle_outline, label: "Criar Turma", color: const Color(0xFFE3F2FD), iconColor: Colors.blue, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCriarTurma())))),
+                const SizedBox(width: 8),
+                Expanded(child: _buildCategoryItem(context, icon: Icons.list_alt, label: "Minhas Turmas", color: const Color(0xFFE8F5E9), iconColor: Colors.green, textColor: subTextColor, onTap: () => onNavigateToTab(1))), // Vai para aba turmas
+                const SizedBox(width: 8),
+                Expanded(child: _buildCategoryItem(context, icon: Icons.calendar_month, label: "Calendário", color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: () { /* Navegar para calendario prof */ })),
+                const SizedBox(width: 8),
+                Expanded(child: _buildCategoryItem(context, icon: Icons.person, label: "Perfil", color: const Color(0xFFF3E5F5), iconColor: Colors.purple, textColor: subTextColor, onTap: () => onNavigateToTab(2))), // Vai para aba perfil
               ],
             ),
 
             const SizedBox(height: 32),
 
             // 4. AULAS DE HOJE
-            Text(t.t('prof_aulas_hoje'), style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(t.t('prof_aulas_hoje'), style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
             const SizedBox(height: 16),
 
             asyncTurmas.when(
@@ -159,17 +159,30 @@ class AbaInicioProfessor extends ConsumerWidget {
               error: (e,s) => const SizedBox.shrink(),
               data: (turmas) {
                 final diaAtual = _getDiaSemanaAtual();
+                // Filtra turmas que têm o dia da semana atual no horário (ex: "Seg")
                 final aulasHoje = turmas.where((turma) => turma.horario.toLowerCase().contains(diaAtual)).toList();
                 
                 if (aulasHoje.isEmpty) {
                    return Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
-                    child: Center(child: Text(t.t('prof_sem_aulas'), style: const TextStyle(color: Colors.grey))),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.surfaceDark : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: isDark ? Colors.white10 : Colors.black12)
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_available, size: 40, color: subTextColor),
+                        const SizedBox(height: 8),
+                        Text(t.t('prof_sem_aulas'), style: TextStyle(color: subTextColor)),
+                      ],
+                    ),
                   );
                 }
+                
                 return Column(
-                  children: aulasHoje.map((turma) => _buildClassCard(turma)).toList(),
+                  children: aulasHoje.map((turma) => _buildClassCard(context, turma, isDark)).toList(),
                 );
               },
             ),
@@ -201,63 +214,81 @@ class AbaInicioProfessor extends ConsumerWidget {
     );
   }
 
-  Widget _buildCategoryItem({required IconData icon, required String label, required Color color, required Color iconColor, required VoidCallback onTap}) {
+  Widget _buildCategoryItem(BuildContext context, {
+      required IconData icon, 
+      required String label, 
+      required Color color, 
+      required Color iconColor, 
+      required Color textColor, 
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Container(
-            height: 60, width: 60,
+            height: 55, width: 55,
             decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
-            child: Icon(icon, color: iconColor, size: 28),
+            child: Icon(icon, color: iconColor, size: 26),
           ),
           const SizedBox(height: 8),
-          Text(label, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(label, style: GoogleFonts.poppins(color: textColor, fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 
-  Widget _buildClassCard(TurmaProfessor turma) {
-    // Extrai hora
-    final String hora = turma.horario.split(' ').length > 1 ? turma.horario.split(' ')[1] : turma.horario;
+  Widget _buildClassCard(BuildContext context, TurmaProfessor turma, bool isDark) {
+    // Extrai hora inicial (Ex: "Seg 08:00-10:00" -> "08:00")
+    String hora = "";
+    try {
+       hora = turma.horario.split(' ')[1].split('-')[0];
+    } catch (e) {
+       hora = "Hoje";
+    }
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border(left: BorderSide(color: AppColors.primaryPurple, width: 4)),
-      ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(hora.split('-')[0], style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              Text("Início", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10)),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Container(height: 40, width: 1, color: Colors.white10),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
+    return GestureDetector(
+      onTap: () {
+         Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDetalhesDisciplinaProf(turma: turma)));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border(left: BorderSide(color: AppColors.primaryPurple, width: 4)),
+          boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))],
+        ),
+        child: Row(
+          children: [
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(turma.nome, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(turma.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
+                Text(hora, style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 18)),
+                Text("Início", style: GoogleFonts.poppins(color: isDark ? Colors.grey : Colors.black54, fontSize: 10)),
               ],
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Container(height: 40, width: 1, color: isDark ? Colors.white10 : Colors.black12),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(turma.nome, style: GoogleFonts.poppins(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(turma.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+          ],
+        ),
       ),
     );
   }

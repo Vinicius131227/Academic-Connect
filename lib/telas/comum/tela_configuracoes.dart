@@ -1,4 +1,3 @@
-// lib/telas/comum/tela_configuracoes.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,8 +21,9 @@ class TelaConfiguracoes extends ConsumerWidget {
     final localeAtual = ref.watch(provedorLocalizacao);
 
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.textTheme.bodyLarge?.color;
-    final cardColor = isDark(context) ? AppColors.surfaceDark : Colors.white;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -101,8 +101,6 @@ class TelaConfiguracoes extends ConsumerWidget {
     );
   }
 
-  bool isDark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
-  
   Widget _buildSectionTitle(String title) {
     return Padding(padding: const EdgeInsets.only(bottom: 12.0), child: Text(title, style: GoogleFonts.poppins(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)));
   }

@@ -1,9 +1,8 @@
-// lib/themes/app_theme.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // --- CORES FIXAS (Identidade Visual) ---
+  // CORES FIXAS
   static const Color primaryPurple = Color(0xFF8C52FF); 
   static const Color secondaryPurple = Color(0xFF9D5CFF); 
   static const Color cardYellow = Color(0xFFFBC02D);
@@ -11,22 +10,22 @@ class AppColors {
   static const Color cardBlue = Color(0xFF42A5F5);
   static const Color cardGreen = Color(0xFF66BB6A);
 
-  // --- CORES MODO ESCURO (Dark) ---
+  // DARK
   static const Color backgroundDark = Color(0xFF181818); 
   static const Color surfaceDark = Color(0xFF2C2C2C);    
   static const Color textWhite = Colors.white;
   static const Color textGreyDark = Colors.white54;
 
-  // --- CORES MODO CLARO (Light) ---
-  static const Color backgroundLight = Color(0xFFFFFFFF); // Branco Puro
-  static const Color surfaceLight = Color(0xFFF5F5F5);    // Cinza muito claro
-  static const Color textBlack = Color(0xFF121212);       // Preto
+  // LIGHT
+  static const Color backgroundLight = Color(0xFFFFFFFF); 
+  static const Color surfaceLight = Color(0xFFF5F5F5);    
+  static const Color textBlack = Color(0xFF121212);       
   static const Color textGreyLight = Color(0xFF757575);   
   
   static const Color error = Color(0xFFCF6679);
   static const Color success = Color(0xFF66BB6A);
 
-  // --- ALIASES DE COMPATIBILIDADE ---
+  // ALIASES DE COMPATIBILIDADE
   static const Color background = backgroundDark; 
   static const Color surface = surfaceDark;       
   static const Color inputFill = surfaceDark;
@@ -51,7 +50,7 @@ class AppColors {
 }
 
 class AppTheme {
-  // --- TEMA ESCURO ---
+  // TEMA ESCURO
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
@@ -95,8 +94,7 @@ class AppTheme {
         showUnselectedLabels: false,
       ),
       
-      // OBS: Removemos cardTheme e dialogTheme global para evitar erro de tipo em versões específicas do Flutter.
-      // O estilo será aplicado localmente ou pelo colorScheme.
+      // Sem CardTheme global para evitar erro de versão
       
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -128,12 +126,12 @@ class AppTheme {
     );
   }
 
-  // --- TEMA CLARO ---
+  // TEMA CLARO
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.backgroundLight, // Branco
+      scaffoldBackgroundColor: AppColors.backgroundLight, 
       primaryColor: AppColors.primaryPurple,
 
       colorScheme: const ColorScheme.light(
