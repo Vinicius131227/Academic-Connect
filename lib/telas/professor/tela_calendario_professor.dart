@@ -1,14 +1,20 @@
+// lib/telas/professor/tela_calendario_professor.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../providers/provedores_app.dart';
+import '../../providers/provedor_autenticacao.dart';
 import '../../themes/app_theme.dart';
 import '../../models/prova_agendada.dart';
 import '../comum/widget_carregamento.dart';
-import 'package:intl/intl.dart';
+import '../../services/servico_firestore.dart'; // Para buscar turmas do prof
 
+// Modelo de Feriado
 class Feriado {
   final DateTime data;
   final String nome;
@@ -22,6 +28,7 @@ class Feriado {
   }
 }
 
+// Provider de Feriados
 final feriadosProvider = FutureProvider<List<Feriado>>((ref) async {
   final ano = DateTime.now().year;
   try {
@@ -36,14 +43,14 @@ final feriadosProvider = FutureProvider<List<Feriado>>((ref) async {
   }
 });
 
-class TelaCalendario extends ConsumerStatefulWidget {
-  const TelaCalendario({super.key});
+class TelaCalendarioProfessor extends ConsumerStatefulWidget {
+  const TelaCalendarioProfessor({super.key});
 
   @override
-  ConsumerState<TelaCalendario> createState() => _TelaCalendarioState();
+  ConsumerState<TelaCalendarioProfessor> createState() => _TelaCalendarioProfessorState();
 }
 
-class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
+class _TelaCalendarioProfessorState extends ConsumerState<TelaCalendarioProfessor> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -61,39 +68,60 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Pega ID do Professor Logado
+    final professorUid = ref.watch(provedorNotificadorAutenticacao).usuario?.uid;
+    
+    // 2. Carrega Turmas do Professor (para saber quais provas são dele)
+    final asyncTurmas = ref.watch(provedorStreamTurmasProfessor);
+    
+    // 3. Carrega Todas as Provas
     final asyncProvas = ref.watch(provedorStreamCalendario);
+    
+    // 4. Carrega Feriados
     final asyncFeriados = ref.watch(feriadosProvider);
     
-    // --- TEMA DINÂMICO ---
+    // Tema
     final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
     final calendarBg = isDark ? AppColors.surfaceDark : Colors.white;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Calendário Acadêmico', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        title: Text('Agenda do Professor', style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
       ),
-      body: asyncProvas.when(
-        loading: () => const WidgetCarregamento(),
-        error: (e, s) => Center(child: Text('Erro: $e', style: TextStyle(color: textColor))),
-        data: (provas) {
-          return asyncFeriados.when(
-            loading: () => const WidgetCarregamento(),
-            error: (_,__) => _buildCalendarContent(provas, [], textColor, calendarBg, cardColor),
-            data: (feriados) => _buildCalendarContent(provas, feriados, textColor, calendarBg, cardColor),
+      body: asyncTurmas.when(
+        loading: () => const WidgetCarregamento(texto: "Carregando turmas..."),
+        error: (e, s) => Center(child: Text("Erro: $e")),
+        data: (turmasDoProfessor) {
+          // Lista de IDs das turmas que esse professor é dono
+          final idsTurmasProfessor = turmasDoProfessor.map((t) => t.id).toList();
+
+          return asyncProvas.when(
+            loading: () => const WidgetCarregamento(texto: "Carregando provas..."),
+            error: (e, s) => Center(child: Text("Erro provas: $e")),
+            data: (todasProvas) {
+              // FILTRO: Pega apenas provas que pertencem às turmas deste professor
+              final provasFiltradas = todasProvas.where((p) => idsTurmasProfessor.contains(p.turmaId)).toList();
+
+              return asyncFeriados.when(
+                loading: () => const WidgetCarregamento(),
+                error: (_,__) => _buildBody(provasFiltradas, [], textColor, calendarBg, cardColor),
+                data: (feriados) => _buildBody(provasFiltradas, feriados, textColor, calendarBg, cardColor),
+              );
+            },
           );
         },
       ),
     );
   }
 
-  Widget _buildCalendarContent(List<ProvaAgendada> provas, List<Feriado> feriados, Color textColor, Color calendarBg, Color cardColor) {
+  Widget _buildBody(List<ProvaAgendada> provas, List<Feriado> feriados, Color? textColor, Color calendarBg, Color cardColor) {
     final eventosDoDia = [
       ...provas.where((p) => _isSameDay(p.dataHora, _selectedDay)),
       ...feriados.where((f) => _isSameDay(f.data, _selectedDay)),
@@ -117,17 +145,16 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             
-            // Estilos Corrigidos para Light/Dark
             headerStyle: HeaderStyle(
               titleCentered: true,
               formatButtonVisible: false,
-              titleTextStyle: TextStyle(color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+              titleTextStyle: GoogleFonts.poppins(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
               leftChevronIcon: const Icon(Icons.chevron_left, color: AppColors.primaryPurple),
               rightChevronIcon: const Icon(Icons.chevron_right, color: AppColors.primaryPurple),
             ),
             calendarStyle: CalendarStyle(
               defaultTextStyle: TextStyle(color: textColor),
-              weekendTextStyle: TextStyle(color: textColor.withOpacity(0.6)),
+              weekendTextStyle: TextStyle(color: textColor?.withOpacity(0.6)),
               todayDecoration: BoxDecoration(
                 color: AppColors.primaryPurple.withOpacity(0.3),
                 shape: BoxShape.circle,
@@ -172,12 +199,12 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Eventos do Dia ${DateFormat('dd/MM').format(_selectedDay!)}",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                  "Agenda de ${_selectedDay!.day}/${_selectedDay!.month}",
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
                 ),
                 const SizedBox(height: 16),
                 if (eventosDoDia.isEmpty)
-                  Center(child: Text("Nada agendado para este dia.", style: TextStyle(color: textColor.withOpacity(0.5))))
+                  Center(child: Text("Nenhum evento para este dia.", style: TextStyle(color: textColor?.withOpacity(0.5))))
                 else
                   Expanded(
                     child: ListView.builder(
@@ -195,15 +222,19 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.assignment, color: Colors.white),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                                  child: const Icon(Icons.assignment_ind, color: Colors.white),
+                                ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text("Prova: ${evento.disciplina}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text(evento.titulo, style: const TextStyle(color: Colors.white70)),
-                                      Text(DateFormat('HH:mm').format(evento.dataHora), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                      Text(evento.disciplina, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text(evento.titulo, style: GoogleFonts.poppins(color: Colors.white70)),
+                                      Text(DateFormat('HH:mm').format(evento.dataHora), style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
                                     ],
                                   ),
                                 ),
@@ -226,8 +257,8 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text("Feriado", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                      Text(evento.nome, style: const TextStyle(color: Colors.white70)),
+                                      Text("Feriado", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      Text(evento.nome, style: GoogleFonts.poppins(color: Colors.white70)),
                                     ],
                                   ),
                                 ),

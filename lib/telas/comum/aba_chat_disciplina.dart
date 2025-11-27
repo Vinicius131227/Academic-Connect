@@ -1,4 +1,3 @@
-// lib/telas/comum/aba_chat_disciplina.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/mensagem_chat.dart';
@@ -7,6 +6,7 @@ import '../../providers/provedor_autenticacao.dart';
 import 'widget_carregamento.dart';
 import 'package:intl/intl.dart';
 import '../../themes/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 
 class AbaChatDisciplina extends ConsumerStatefulWidget {
   final String turmaId;
@@ -42,7 +42,7 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
       await ref.read(servicoFirestoreProvider).enviarMensagem(widget.turmaId, novaMensagem);
       _controller.clear();
     } catch (e) {
-      // Erro silencioso ou snackbar
+      // Silent error
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -50,26 +50,33 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final streamMensagens = ref.watch(streamMensagensProvider(widget.turmaId));
     final meuUid = ref.watch(provedorNotificadorAutenticacao).usuario?.uid;
+    
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = theme.scaffoldBackgroundColor;
+    final inputColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = theme.textTheme.bodyLarge?.color;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: bgColor,
       body: Column(
         children: [
           Expanded(
             child: streamMensagens.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, st) => const Center(child: Text('Erro no chat', style: TextStyle(color: Colors.white))),
+              error: (err, st) => Center(child: Text('Erro', style: TextStyle(color: textColor))),
               data: (mensagens) {
                 if (mensagens.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.white24),
-                        SizedBox(height: 16),
-                        Text('Nenhuma mensagem ainda.', style: TextStyle(color: Colors.white54)),
+                        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(t.t('chat_vazio'), style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
                   );
@@ -82,18 +89,18 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
                   itemBuilder: (context, index) {
                     final msg = mensagens[index];
                     final bool souEu = msg.usuarioId == meuUid;
-                    return _buildBubble(msg, souEu);
+                    return _buildBubble(msg, souEu, textColor!);
                   },
                 );
               },
             ),
           ),
-          // Input Moderno
+          
           Container(
             padding: const EdgeInsets.all(16.0),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDark : Colors.grey[100],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
               child: Row(
@@ -102,15 +109,15 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: AppColors.background,
+                        color: inputColor,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: TextField(
                         controller: _controller,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          hintText: 'Digite uma mensagem...',
-                          hintStyle: TextStyle(color: Colors.white24),
+                        style: TextStyle(color: textColor),
+                        decoration: InputDecoration(
+                          hintText: t.t('chat_placeholder'),
+                          hintStyle: const TextStyle(color: Colors.grey),
                           border: InputBorder.none,
                         ),
                         textCapitalization: TextCapitalization.sentences,
@@ -138,7 +145,7 @@ class _AbaChatDisciplinaState extends ConsumerState<AbaChatDisciplina> {
     );
   }
 
-  Widget _buildBubble(MensagemChat msg, bool souEu) {
+  Widget _buildBubble(MensagemChat msg, bool souEu, Color textColor) {
     return Align(
       alignment: souEu ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

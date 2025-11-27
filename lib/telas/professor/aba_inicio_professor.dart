@@ -17,6 +17,7 @@ import 'tela_criar_turma.dart';
 import 'tela_presenca_nfc.dart'; // Caso queira atalho direto
 import 'tela_lancar_notas.dart'; // Caso queira atalho direto
 import 'tela_detalhes_disciplina_prof.dart'; // Para abrir a turma
+import 'tela_calendario_professor.dart';
 
 class AbaInicioProfessor extends ConsumerWidget {
   final ValueSetter<int> onNavigateToTab;
@@ -142,7 +143,7 @@ class AbaInicioProfessor extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(child: _buildCategoryItem(context, icon: Icons.list_alt, label: "Minhas Turmas", color: const Color(0xFFE8F5E9), iconColor: Colors.green, textColor: subTextColor, onTap: () => onNavigateToTab(1))), // Vai para aba turmas
                 const SizedBox(width: 8),
-                Expanded(child: _buildCategoryItem(context, icon: Icons.calendar_month, label: "Calendário", color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: () { /* Navegar para calendario prof */ })),
+                Expanded(child: _buildCategoryItem(context, icon: Icons.calendar_month, label: "Calendário", color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: () { Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCalendarioProfessor()));})),
                 const SizedBox(width: 8),
                 Expanded(child: _buildCategoryItem(context, icon: Icons.person, label: "Perfil", color: const Color(0xFFF3E5F5), iconColor: Colors.purple, textColor: subTextColor, onTap: () => onNavigateToTab(2))), // Vai para aba perfil
               ],

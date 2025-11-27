@@ -1,4 +1,3 @@
-// lib/telas/aluno/tela_drive_provas.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -34,9 +33,8 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Cores
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final cardColor = theme.cardTheme.color ?? (isDark ? AppColors.surfaceDark : Colors.white);
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -52,7 +50,7 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: () => _exibirDialogoUpload(context),
-            tooltip: "Contribuir com Prova",
+            tooltip: "Contribuir",
           )
         ],
       ),
@@ -65,7 +63,7 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
               controller: _buscaController,
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
-                hintText: "Buscar disciplina ou prova...",
+                hintText: "Buscar disciplina ou ano...",
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: cardColor,
@@ -78,24 +76,36 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
           // Lista
           Expanded(
             child: asyncProvas.when(
-              loading: () => const WidgetCarregamento(texto: "Carregando drive..."),
-              error: (e, s) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                    const SizedBox(height: 16),
-                    const Text("Erro ao carregar provas.\nVerifique se o índice foi criado no Firebase.", textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
+              loading: () => const WidgetCarregamento(texto: "Carregando provas..."),
+              error: (e, s) {
+                 // Log do erro para você clicar no link do terminal
+                 debugPrint("ERRO NO FIREBASE (DRIVE): $e");
+                 
+                 return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 48, color: AppColors.error),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Índice necessário", 
+                          style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          "Olhe o terminal (debug console) e clique no link para criar o índice no Firebase.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
               data: (materiais) {
-                // 1. Filtra por busca
                 final filtrados = materiais.where((m) {
-                  // Como não temos o nome da disciplina no MaterialAula solto, usamos o titulo/descrição
-                  // Ou idealmente, o 'nomeBaseDisciplina' que salvamos no Firestore. 
-                  // Como o model MaterialAula original não tinha esse campo na memória, 
-                  // usamos o título para filtrar.
                   return m.titulo.toLowerCase().contains(_termoBusca) || 
                          m.descricao.toLowerCase().contains(_termoBusca);
                 }).toList();
@@ -113,8 +123,6 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                   );
                 }
 
-                // 2. Agrupa por "Pasta" (Simulando pastas pelo título ou descrição)
-                // Para simplificar e ficar visualmente bonito, vamos listar como Cards de Arquivo
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: filtrados.length,
@@ -123,6 +131,7 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                     return Card(
                       color: cardColor,
                       margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 0,
                       child: ListTile(
                         leading: Container(
                           padding: const EdgeInsets.all(10),
@@ -170,77 +179,18 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _exibirDialogoUpload(context),
-        backgroundColor: AppColors.primaryPurple,
-        icon: const Icon(Icons.upload_file, color: Colors.white),
-        label: const Text("Enviar Prova", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
     );
   }
 
-  // Dialog para simular upload (já que o aluno não pode escrever em qualquer lugar por segurança padrão)
-  // Numa implementação real, salvaríamos em uma coleção 'uploads_alunos' para moderação.
   void _exibirDialogoUpload(BuildContext context) {
-    final titleController = TextEditingController();
-    final subjectController = TextEditingController();
-    final urlController = TextEditingController();
-    
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).cardTheme.color,
-        title: const Text("Contribuir com o Drive"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Compartilhe provas antigas com a comunidade.", style: TextStyle(fontSize: 12)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: subjectController,
-              decoration: const InputDecoration(labelText: "Disciplina (Ex: Cálculo 1)", border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: titleController,
-              decoration: const InputDecoration(labelText: "Título (Ex: P1 2023)", border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(labelText: "Link do PDF (Drive/Dropbox)", border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                 // Simulação de File Picker
-                 FilePickerResult? result = await FilePicker.platform.pickFiles();
-                 if (result != null) {
-                    urlController.text = result.files.single.name; // Apenas visual
-                 }
-              },
-              icon: const Icon(Icons.attach_file),
-              label: const Text("Ou selecionar arquivo"),
-            )
-          ],
-        ),
+        title: const Text("Enviar Prova"),
+        content: const Text("O upload de arquivos será liberado em breve pelo C.A."),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancelar"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-               // AQUI ENTRARIA A LÓGICA DE SALVAR NO FIRESTORE
-               // Como é complexo salvar sem ter o ID da turma correto,
-               // vamos simular o sucesso para o MVP.
-               Navigator.pop(ctx);
-               ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text("Obrigado! Sua prova foi enviada para análise."), backgroundColor: Colors.green),
-               );
-            },
-            child: const Text("Enviar"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
         ],
       ),
     );

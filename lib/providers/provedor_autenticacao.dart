@@ -1,4 +1,3 @@
-// lib/providers/provedor_autenticacao.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +33,7 @@ class EstadoAutenticacao {
       status: status ?? this.status,
       usuario: limparUsuario ? null : (usuario ?? this.usuario),
       carregando: carregando ?? this.carregando,
-      erro: erro ?? this.erro,
+      erro: erro, // Se passar null, limpa o erro
     );
   }
 }
@@ -48,12 +47,13 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     _checarStatusAutenticacao();
   }
 
+  // Monitora o estado do usuário no Firebase (Persistência)
   Future<void> _checarStatusAutenticacao() async {
-    await Future.delayed(const Duration(seconds: 1)); 
+    await Future.delayed(const Duration(seconds: 1)); // Pequeno delay para evitar flash
     _auth.authStateChanges().listen((User? user) async {
       if (user != null) {
-        final usuarioApp =
-            await _ref.read(servicoFirestoreProvider).getUsuario(user.uid);
+        // Usuário logado, busca dados no Firestore
+        final usuarioApp = await _ref.read(servicoFirestoreProvider).getUsuario(user.uid);
 
         if (usuarioApp != null) {
           state = EstadoAutenticacao(
@@ -61,6 +61,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
             usuario: usuarioApp,
           );
         } else {
+          // Usuário existe no Auth mas não no Firestore (ex: primeiro login Google)
           final novoUsuario = await _criarDocumentoUsuarioPadrao(
             uid: user.uid,
             email: user.email ?? '',
@@ -71,22 +72,28 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
           );
         }
       } else {
+        // Usuário deslogado
         state = EstadoAutenticacao(status: StatusAutenticacao.naoAutenticado);
       }
     });
   }
 
+  // Login com Email e Senha
   Future<void> login(String email, String password) async {
     try {
       state = state.copyWith(erro: null, carregando: true);
       await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // O listener _checarStatusAutenticacao vai atualizar o estado automaticamente
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(carregando: false, erro: _traduzirErroAuth(e.code));
+      throw e; // Relança para a UI saber que falhou
     } catch (e) {
-      state = state.copyWith(carregando: false, erro: 'Um erro inesperado ocorreu.');
+      state = state.copyWith(carregando: false, erro: 'Erro inesperado: $e');
+      throw e;
     }
   }
 
+  // Cadastro de Aluno
   Future<void> signUp({
     required String email,
     required String password,
@@ -125,13 +132,14 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
       }
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(carregando: false, erro: _traduzirErroAuth(e.code));
-      throw Exception(_traduzirErroAuth(e.code));
+      throw e;
     } catch (e) {
-      state = state.copyWith(carregando: false, erro: 'Um erro inesperado ocorreu.');
-      throw Exception('Um erro inesperado ocorreu.');
+      state = state.copyWith(carregando: false, erro: 'Erro ao cadastrar: $e');
+      throw e;
     }
   }
   
+  // Cadastro de Professor ou CA (Com Identificação Específica)
   Future<void> signUpComIdentificacao({
     required String email,
     required String password,
@@ -154,10 +162,11 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
           papel: papel, 
           alunoInfo: AlunoInfo(
             nomeCompleto: nomeCompleto,
-            ra: identificacao, // Pode ser vazio
+            ra: identificacao, // Usa o campo RA para armazenar a ID
             curso: '',
             cr: 0.0,
             status: '',
+            dataNascimento: DateTime.now() // Placeholder
           ),
           nfcCardId: null,
           tipoIdentificacao: tipoIdentificacao,
@@ -167,53 +176,45 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
       }
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(carregando: false, erro: _traduzirErroAuth(e.code));
-      throw Exception(_traduzirErroAuth(e.code));
+      throw e;
     } catch (e) {
-      state = state.copyWith(carregando: false, erro: 'Um erro inesperado ocorreu.');
-      throw Exception('Um erro inesperado ocorreu.');
+      state = state.copyWith(carregando: false, erro: 'Erro ao cadastrar: $e');
+      throw e;
     }
   }
 
+  // Login com Google
   Future<void> loginComGoogle() async {
     try {
       state = state.copyWith(erro: null, carregando: true);
-      UserCredential? userCredential;
       
       if (kIsWeb) {
-        final provider = GoogleAuthProvider();
-        userCredential = await _auth.signInWithPopup(provider);
+        // Web
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        final userCredential = await _auth.signInWithPopup(googleProvider);
+        if (userCredential.user != null) {
+          await _processarLoginSucesso(userCredential.user!);
+        }
       } else {
+        // Mobile
         final GoogleSignIn googleSignIn = GoogleSignIn();
         final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        
         if (googleUser == null) { 
+          // Usuário cancelou o login
           state = state.copyWith(carregando: false);
           return;
         }
-        final GoogleSignInAuthentication googleAuth =
-            await googleUser.authentication;
-        if (googleAuth.idToken == null) {
-          state = state.copyWith(
-              carregando: false,
-              erro: "Falha ao obter credenciais do Google.");
-          return;
-        }
+        
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
         final AuthCredential credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
-        userCredential = await _auth.signInWithCredential(credential);
-      }
-
-      if (userCredential.user != null) {
-        final user = userCredential.user!;
-        final servico = _ref.read(servicoFirestoreProvider);
-        final usuarioExistente = await servico.getUsuario(user.uid);
         
-        if (usuarioExistente == null) {
-          await _criarDocumentoUsuarioPadrao(
-            uid: user.uid,
-            email: user.email ?? '',
-          );
+        final userCredential = await _auth.signInWithCredential(credential);
+        if (userCredential.user != null) {
+          await _processarLoginSucesso(userCredential.user!);
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -224,12 +225,28 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
+  // Helper para login social
+  Future<void> _processarLoginSucesso(User user) async {
+    final servico = _ref.read(servicoFirestoreProvider);
+    final usuarioExistente = await servico.getUsuario(user.uid);
+    
+    if (usuarioExistente == null) {
+      // Se é novo, cria doc padrão
+      await _criarDocumentoUsuarioPadrao(
+        uid: user.uid,
+        email: user.email ?? '',
+      );
+    }
+  }
+
+  // Atualizar Perfil
   Future<void> salvarPerfilAluno(AlunoInfo info) async {
     final user = state.usuario;
     if (user == null) return;
     
     try {
       await _ref.read(servicoFirestoreProvider).salvarPerfilAluno(user.uid, info);
+      // Atualiza o estado local
       final usuarioAtualizado = user.copyWith(alunoInfo: info);
       state = state.copyWith(usuario: usuarioAtualizado);
     } catch (e) {
@@ -238,6 +255,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
+  // Definir Papel (Aluno/Prof/CA)
   Future<void> selecionarPapel(String papel, {String? tipoIdentificacao, String? numIdentificacao}) async {
     state = state.copyWith(carregando: true);
     final user = state.usuario;
@@ -249,6 +267,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
         tipoIdentificacao: tipoIdentificacao
       );
       
+      // Recarrega o usuário completo
       final usuarioAtualizado = await _ref.read(servicoFirestoreProvider).getUsuario(user.uid);
       
       state = state.copyWith(
@@ -261,11 +280,18 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
+  // Logout
   Future<void> logout() async {
     await _auth.signOut();
-    await GoogleSignIn().signOut();
+    try {
+      await GoogleSignIn().signOut();
+    } catch (e) {
+      // Ignora se não estava logado com Google
+    }
+    // O listener _checarStatusAutenticacao vai mudar o estado para naoAutenticado
   }
 
+  // Cria doc vazio no Firestore
   Future<UsuarioApp> _criarDocumentoUsuarioPadrao({required String uid, required String email}) async {
     final info = AlunoInfo(
       nomeCompleto: '',
@@ -279,7 +305,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     final novoUsuario = UsuarioApp(
       uid: uid,
       email: email,
-      papel: '', 
+      papel: '', // Papel vazio força ida para tela de cadastro
       alunoInfo: info, 
       nfcCardId: null,
       tipoIdentificacao: null,
@@ -289,10 +315,12 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     return novoUsuario;
   }
   
+  // Tradutor de Erros do Firebase
   String _traduzirErroAuth(String code) {
     switch (code) {
       case 'user-not-found':
       case 'wrong-password':
+      case 'invalid-credential': // Código novo
       case 'INVALID_LOGIN_CREDENTIALS':
         return 'E-mail ou senha inválidos.';
       case 'email-already-in-use':
@@ -301,9 +329,15 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
         return 'A senha é muito fraca (mínimo 6 caracteres).';
       case 'invalid-email':
         return 'O formato do e-mail é inválido.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Tente novamente mais tarde.';
+      case 'network-request-failed':
+        return 'Sem conexão com a internet.';
       default:
         debugPrint('Erro Auth não traduzido: $code');
-        return 'Erro de autenticação. Tente novamente.';
+        return 'Erro de autenticação. Verifique seus dados.';
     }
   }
 }

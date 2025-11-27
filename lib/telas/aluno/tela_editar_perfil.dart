@@ -29,19 +29,27 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
 
   final List<String> _statusOpcoes = ['Regular', 'Trancado', 'Jubilado', 'Concluído'];
   bool _controllersInicializados = false;
+  bool _isAluno = true; // Flag para saber se mostra campos de aluno
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_controllersInicializados) {
-      final alunoInfo = ref.read(provedorNotificadorAutenticacao).usuario?.alunoInfo;
+      final usuario = ref.read(provedorNotificadorAutenticacao).usuario;
+      final alunoInfo = usuario?.alunoInfo;
+      
+      // Verifica se é aluno
+      _isAluno = usuario?.papel == 'aluno';
+
       _nomeController.text = alunoInfo?.nomeCompleto ?? '';
       _raController.text = alunoInfo?.ra ?? '';
+      
       if (alunoInfo != null && AppLocalizations.cursos.contains(alunoInfo.curso)) {
         _cursoSelecionado = alunoInfo.curso;
       }
       _dataNascimento = alunoInfo?.dataNascimento;
       _statusSelecionado = alunoInfo?.status ?? 'Regular';
+      
       if (alunoInfo != null) {
          _alunoInfoOriginal = alunoInfo;
       } else {
@@ -53,7 +61,9 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
 
   Future<void> _salvarPerfil() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_dataNascimento == null || _cursoSelecionado == null) {
+    
+    // Se for aluno, valida campos extras
+    if (_isAluno && (_dataNascimento == null || _cursoSelecionado == null)) {
        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha todos os campos.'), backgroundColor: AppColors.error));
        return;
     }
@@ -63,16 +73,16 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
     final novoAlunoInfo = AlunoInfo(
       nomeCompleto: _nomeController.text.trim(),
       ra: _raController.text.trim(),
-      curso: _cursoSelecionado!,
-      dataNascimento: _dataNascimento,
+      curso: _isAluno ? _cursoSelecionado! : '', // Prof/CA não tem curso
+      dataNascimento: _isAluno ? _dataNascimento : null,
       cr: _alunoInfoOriginal.cr, 
-      status: _statusSelecionado!,
+      status: _isAluno ? _statusSelecionado! : '',
     );
 
     try {
       await ref.read(provedorNotificadorAutenticacao.notifier).salvarPerfilAluno(novoAlunoInfo);
       if (widget.isFromSignUp) {
-          await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel('aluno');
+          await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel(ref.read(provedorNotificadorAutenticacao).usuario!.papel);
       }
       if (mounted) {
         Navigator.pop(context);
@@ -101,7 +111,7 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
     final textColor = theme.textTheme.bodyLarge?.color;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, // DINÂMICO
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(t.t('editar_perfil_titulo'), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
         leading: IconButton(
@@ -122,7 +132,6 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sem foto, apenas campos
               _buildLabel("NOME COMPLETO"),
               TextFormField(
                 controller: _nomeController,
@@ -131,46 +140,49 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
               ),
               const SizedBox(height: 20),
 
-              _buildLabel("RA (MATRÍCULA)"),
+              _buildLabel(_isAluno ? "RA (MATRÍCULA)" : "ID / SIAPE"),
               TextFormField(
                 controller: _raController,
                 style: TextStyle(color: textColor),
-                decoration: const InputDecoration(hintText: "Digite seu RA"),
-                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(hintText: "Digite o número"),
+                keyboardType: TextInputType.text,
               ),
               const SizedBox(height: 20),
 
-              _buildLabel("CURSO"),
-              DropdownButtonFormField<String>(
-                value: _cursoSelecionado,
-                style: TextStyle(color: textColor),
-                decoration: const InputDecoration(hintText: "Selecione o curso"),
-                items: AppLocalizations.cursos.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setState(() => _cursoSelecionado = v),
-              ),
-              const SizedBox(height: 20),
+              // CAMPOS SÓ PARA ALUNO
+              if (_isAluno) ...[
+                _buildLabel("CURSO"),
+                DropdownButtonFormField<String>(
+                  value: _cursoSelecionado,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(hintText: "Selecione o curso"),
+                  items: AppLocalizations.cursos.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setState(() => _cursoSelecionado = v),
+                ),
+                const SizedBox(height: 20),
 
-              _buildLabel("DATA DE NASCIMENTO"),
-              InkWell(
-                onTap: _selecionarDataNascimento,
-                child: InputDecorator(
-                  decoration: const InputDecoration(suffixIcon: Icon(Icons.calendar_today)),
-                  child: Text(
-                    _dataNascimento == null ? 'Selecionar Data' : DateFormat('dd/MM/yyyy').format(_dataNascimento!),
-                    style: TextStyle(color: textColor),
+                _buildLabel("DATA DE NASCIMENTO"),
+                InkWell(
+                  onTap: _selecionarDataNascimento,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(suffixIcon: Icon(Icons.calendar_today)),
+                    child: Text(
+                      _dataNascimento == null ? 'Selecionar Data' : DateFormat('dd/MM/yyyy').format(_dataNascimento!),
+                      style: TextStyle(color: textColor),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              
-              _buildLabel("STATUS"),
-              DropdownButtonFormField<String>(
-                value: _statusSelecionado,
-                style: TextStyle(color: textColor),
-                decoration: const InputDecoration(),
-                items: _statusOpcoes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setState(() => _statusSelecionado = v),
-              ),
+                const SizedBox(height: 20),
+                
+                _buildLabel("STATUS"),
+                DropdownButtonFormField<String>(
+                  value: _statusSelecionado,
+                  style: TextStyle(color: textColor),
+                  decoration: const InputDecoration(),
+                  items: _statusOpcoes.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (v) => setState(() => _statusSelecionado = v),
+                ),
+              ],
             ],
           ),
         ),

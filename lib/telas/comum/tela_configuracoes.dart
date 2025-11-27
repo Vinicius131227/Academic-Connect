@@ -1,3 +1,4 @@
+// lib/telas/comum/tela_configuracoes.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,7 +7,6 @@ import '../../themes/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/provedor_tema.dart';
 import '../../providers/provedor_localizacao.dart';
-import 'tela_onboarding.dart';
 
 class TelaConfiguracoes extends ConsumerWidget {
   const TelaConfiguracoes({super.key});
@@ -24,6 +24,7 @@ class TelaConfiguracoes extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.textTheme.bodyLarge?.color;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final borderColor = isDark ? Colors.transparent : Colors.grey.shade300;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -39,6 +40,7 @@ class TelaConfiguracoes extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
+            // Cabeçalho
             Row(
               children: [
                 CircleAvatar(radius: 30, backgroundColor: AppColors.primaryPurple, child: Text(nome.isNotEmpty ? nome[0].toUpperCase() : 'U', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white))),
@@ -48,23 +50,28 @@ class TelaConfiguracoes extends ConsumerWidget {
             ),
             const SizedBox(height: 40),
             
+            // TEMA
             _buildSectionTitle(t.t('config_secao_aparencia')),
             Container(
-              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
               child: Column(
                 children: [
                   _buildRadioItem(t.t('config_tema_claro'), temaAtual == ModoSistemaTema.claro, textColor, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.claro)),
                   Divider(height: 1, color: textColor?.withOpacity(0.1)),
                   _buildRadioItem(t.t('config_tema_escuro'), temaAtual == ModoSistemaTema.escuro, textColor, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.escuro)),
+                  Divider(height: 1, color: textColor?.withOpacity(0.1)),
+                  // Opção Sistema
+                  _buildRadioItem("Sistema", temaAtual == ModoSistemaTema.sistema, textColor, () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.sistema)),
                 ],
               ),
             ),
             
             const SizedBox(height: 24),
 
+            // IDIOMA
             _buildSectionTitle(t.t('config_secao_idioma')),
             Container(
-              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
               child: Column(
                 children: [
                   _buildRadioItem("Português", localeAtual.languageCode == 'pt', textColor, () => ref.read(provedorLocalizacao.notifier).mudarLingua('pt')),
@@ -75,16 +82,12 @@ class TelaConfiguracoes extends ConsumerWidget {
                 ],
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            _buildSectionTitle(t.t('config_secao_geral')),
-            _buildSettingItem(Icons.help_outline, t.t('config_ajuda'), textColor, cardColor, () {
-               Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaOnboarding()));
-            }),
             
+            // Removido GERAL (Ajuda/Sugestões) conforme pedido
+
             const SizedBox(height: 40),
             
+            // LOGOUT
             TextButton.icon(
               onPressed: () {
                 ref.read(provedorNotificadorAutenticacao.notifier).logout();
@@ -106,8 +109,5 @@ class TelaConfiguracoes extends ConsumerWidget {
   }
   Widget _buildRadioItem(String title, bool selected, Color? color, VoidCallback onTap) {
     return ListTile(onTap: onTap, title: Text(title, style: GoogleFonts.poppins(color: color)), trailing: selected ? const Icon(Icons.check_circle, color: AppColors.primaryPurple) : const Icon(Icons.circle_outlined, color: Colors.grey));
-  }
-  Widget _buildSettingItem(IconData icon, String title, Color? color, Color? bgColor, VoidCallback onTap) {
-    return ListTile(onTap: onTap, contentPadding: EdgeInsets.zero, leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: Colors.grey)), title: Text(title, style: GoogleFonts.poppins(fontSize: 16, color: color, fontWeight: FontWeight.w500)), trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 14));
   }
 }

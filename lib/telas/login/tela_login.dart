@@ -1,4 +1,3 @@
-// lib/telas/login/tela_login.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +5,7 @@ import '../../providers/provedor_autenticacao.dart';
 import 'tela_esqueceu_senha.dart'; 
 import '../../l10n/app_localizations.dart';
 import 'tela_cadastro_usuario.dart';
+import 'portao_autenticacao.dart'; // Importante para o redirecionamento
 import '../comum/overlay_carregamento.dart'; 
 import '../../themes/app_theme.dart'; 
 
@@ -30,22 +30,30 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
 
   Future<void> _login() async {
       if (_formKey.currentState!.validate()) {
+        // Ativa o loading global
         ref.read(provedorCarregando.notifier).state = true;
-        await ref.read(provedorNotificadorAutenticacao.notifier).login(
-              _emailController.text.trim(),
-              _passwordController.text.trim(),
-            );
-        if (mounted) {
-          ref.read(provedorCarregando.notifier).state = false;
+        
+        // Chama o login. NÃO navegamos aqui manualmente. 
+        // O listener (ref.listen) abaixo fará isso ao detectar a mudança de estado.
+        try {
+          await ref.read(provedorNotificadorAutenticacao.notifier).login(
+                _emailController.text.trim(),
+                _passwordController.text.trim(),
+              );
+        } catch (e) {
+           // Erro já tratado no provider, mas garantimos parar o loading aqui se algo escapar
+        } finally {
+           if (mounted) ref.read(provedorCarregando.notifier).state = false;
         }
       }
   }
 
   Future<void> _loginGoogle() async {
     ref.read(provedorCarregando.notifier).state = true;
-    await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
-    if (mounted) {
-      ref.read(provedorCarregando.notifier).state = false;
+    try {
+      await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
+    } finally {
+      if (mounted) ref.read(provedorCarregando.notifier).state = false;
     }
   }
 
@@ -56,20 +64,32 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
     final size = MediaQuery.of(context).size;
     final bool isDesktop = size.width > 800;
 
+    // --- TEMA DINÂMICO ---
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // CORREÇÃO: Uso de Cores Não-Nulas (Garantia com '!' ou fallback)
+    // Cores Adaptáveis
     final textColor = isDark ? Colors.white : Colors.black87;
-    final Color subTextColor = isDark ? Colors.grey[500]! : Colors.grey[600]!;
+    // Usamos ! para garantir que a cor não é nula e evitar erro no withOpacity
+    final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final dividerColor = isDark ? Colors.white24 : Colors.black12;
-    final Color inputBorderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
+    final inputBorderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
 
+    // --- ESCUTA DE ESTADO (REDIRECIONAMENTO) ---
     ref.listen(provedorNotificadorAutenticacao, (previous, next) {
+      // Se houver erro, mostra SnackBar
       if (next.erro != null && previous?.erro != next.erro) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(next.erro!), backgroundColor: AppColors.error),
         );
+      }
+      
+      // Se autenticou com sucesso, navega para o Portão (que vai pra Home)
+      if (next.status == StatusAutenticacao.autenticado) {
+         Navigator.of(context).pushAndRemoveUntil(
+           MaterialPageRoute(builder: (_) => const PortaoAutenticacao()),
+           (route) => false, // Remove o histórico de login
+         );
       }
     });
 
@@ -77,6 +97,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Row(
         children: [
+          // --- LADO ESQUERDO: FORMULÁRIO ---
           Expanded(
             flex: 4,
             child: Center(
@@ -89,6 +110,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Logo AC com Gradiente
                         Container(
                           padding: const EdgeInsets.all(16), 
                           decoration: BoxDecoration(
@@ -104,6 +126,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 24),
                         
+                        // Títulos de Boas-vindas
                         Text(
                           t.t('login_titulo'), 
                           style: GoogleFonts.poppins(
@@ -121,6 +144,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 40),
 
+                        // Campo Email
                         _buildTextField(
                           label: t.t('login_email'),
                           hint: 'user@email.com',
@@ -129,10 +153,10 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                           textColor: textColor,
                           subTextColor: subTextColor,
                           borderColor: inputBorderColor,
-                          isDark: isDark,
                         ),
                         const SizedBox(height: 20),
                         
+                        // Campo Senha
                         _buildTextField(
                           label: t.t('login_senha'),
                           hint: '••••••••',
@@ -143,9 +167,9 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                           textColor: textColor,
                           subTextColor: subTextColor,
                           borderColor: inputBorderColor,
-                          isDark: isDark,
                         ),
 
+                        // Esqueceu a senha
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
@@ -161,6 +185,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 12),
 
+                        // Botão Login
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -182,6 +207,8 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         
                         const SizedBox(height: 24),
+                        
+                        // Divisor "Ou continue com"
                         Row(
                           children: [
                             Expanded(child: Divider(color: dividerColor)), 
@@ -197,6 +224,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 24),
                         
+                        // Botão Google
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -222,6 +250,8 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         
                         const SizedBox(height: 24),
+                        
+                        // Link Cadastro
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center, 
                           children: [
@@ -249,6 +279,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
             ),
           ),
           
+          // --- LADO DIREITO: ARTE (Apenas Desktop) ---
           if (isDesktop) 
             Expanded(
               flex: 5, 
@@ -270,6 +301,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                       style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)
                     ),
                     const SizedBox(height: 40),
+                    // Ícone Grande
                     const Icon(Icons.school_rounded, size: 200, color: Colors.white24),
                   ],
                 ),
@@ -290,7 +322,6 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
     required Color textColor,
     required Color subTextColor,
     required Color borderColor,
-    required bool isDark
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,6 +341,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
           style: TextStyle(color: textColor),
           decoration: InputDecoration(
             hintText: hint, 
+            // Placeholder transparente para não confundir
             hintStyle: TextStyle(color: subTextColor.withOpacity(0.3)), 
             prefixIcon: Icon(icon, color: subTextColor),
             suffixIcon: isPassword 
@@ -322,7 +354,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                   ) 
                 : null,
             filled: true,
-            fillColor: Colors.transparent,
+            fillColor: Colors.transparent, 
             contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: borderColor),

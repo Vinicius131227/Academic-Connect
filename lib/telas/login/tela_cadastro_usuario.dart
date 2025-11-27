@@ -7,6 +7,7 @@ import '../../models/aluno_info.dart';
 import '../../l10n/app_localizations.dart';
 import '../comum/overlay_carregamento.dart';
 import '../../themes/app_theme.dart';
+import 'portao_autenticacao.dart'; // Importante
 
 class TelaCadastroUsuario extends ConsumerStatefulWidget {
   final bool isInitialSetup;
@@ -27,6 +28,7 @@ class TelaCadastroUsuario extends ConsumerStatefulWidget {
 class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   final _formKey = GlobalKey<FormState>();
 
+  // ... (Variáveis e Controllers Iguais ao anterior) ...
   String _papelSelecionado = 'aluno';
   final _nomeController = TextEditingController();
   final _raOuIdController = TextEditingController();
@@ -35,11 +37,9 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   late TextEditingController _passwordController;
   late TextEditingController _confirmPasswordController;
   final _dataNascimentoController = TextEditingController();
-
   DateTime? _dataNascimento;
   String? _universidadeSelecionada = 'UFSCar - Campus Sorocaba';
   String? _tipoIdentificacao;
-
   final List<String> _opcoesIdentificacao = ['Matrícula', 'SIAPE', 'Outro'];
 
   @override
@@ -48,13 +48,13 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     _emailController = TextEditingController(text: widget.email);
     _passwordController = TextEditingController(text: widget.password);
     _confirmPasswordController = TextEditingController(text: widget.password);
-    
     if (widget.isInitialSetup) {
       final user = ref.read(provedorNotificadorAutenticacao).usuario;
       if (user != null) _emailController.text = user.email;
     }
   }
-
+  
+  // ... (Dispose e SelecionarData mantidos) ...
   @override
   void dispose() {
     _nomeController.dispose();
@@ -88,7 +88,10 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data de nascimento obrigatória'), backgroundColor: Colors.redAccent));
       return;
     }
+
+    // INICIA LOADING
     ref.read(provedorCarregando.notifier).state = true;
+    
     final t = AppLocalizations.of(context)!;
 
     try {
@@ -128,23 +131,43 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
           );
         }
       }
+      
+      // SUCESSO
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.t('cadastro_sucesso')), backgroundColor: Colors.green));
-        if (!widget.isInitialSetup) Navigator.pop(context);
+        
+        // Se não for setup inicial (google), vai para o Portão
+        if (!widget.isInitialSetup) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const PortaoAutenticacao()),
+              (route) => false,
+            );
+        } else {
+           // Se for Google, apenas fecha o modal de cadastro para o Portão assumir
+           Navigator.pop(context);
+        }
       }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red));
       }
     } finally {
-      if (mounted) ref.read(provedorCarregando.notifier).state = false;
+      // PARA LOADING SEMPRE
+      if (mounted) {
+        ref.read(provedorCarregando.notifier).state = false;
+      }
     }
   }
 
   Future<void> _googleSignUp() async {
     ref.read(provedorCarregando.notifier).state = true;
-    await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
-    if (mounted) ref.read(provedorCarregando.notifier).state = false;
+    try {
+      await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
+      // Se der certo, o listener no build ou no Portao vai redirecionar
+    } finally {
+      if (mounted) ref.read(provedorCarregando.notifier).state = false;
+    }
   }
 
   @override
@@ -159,6 +182,16 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     final Color fillColor = isDark ? AppColors.surfaceDark : Colors.white;
     final Color dropdownColor = isDark ? AppColors.surfaceDark : Colors.white;
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
+
+    // --- LISTENER PARA REDIRECIONAR (Segurança Extra) ---
+    ref.listen(provedorNotificadorAutenticacao, (previous, next) {
+       if (next.status == StatusAutenticacao.autenticado && !widget.isInitialSetup) {
+           Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const PortaoAutenticacao()),
+              (route) => false,
+            );
+       }
+    });
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -185,42 +218,11 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         Text(t.t('cadastro_subtitulo'), style: GoogleFonts.poppins(fontSize: 14, color: subTextColor), textAlign: TextAlign.center),
                         const SizedBox(height: 30),
 
-                        _buildStyledDropdown(
-                          label: t.t('cadastro_universidade'),
-                          value: 'UFSCar - Campus Sorocaba',
-                          items: const ['UFSCar - Campus Sorocaba'],
-                          onChanged: null,
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          fillColor: fillColor,
-                          dropdownColor: dropdownColor,
-                        ),
+                        // (RESTO DOS CAMPOS IGUAL AO ANTERIOR, APENAS MANTENHA A ESTRUTURA)
+                        _buildStyledDropdown(label: t.t('cadastro_universidade'), value: 'UFSCar - Campus Sorocaba', items: const ['UFSCar - Campus Sorocaba'], onChanged: null, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor, dropdownColor: dropdownColor),
                         const SizedBox(height: 20),
-
-                        _buildStyledDropdown(
-                          label: t.t('cadastro_papel_label'),
-                          value: _papelSelecionado,
-                          items: ['aluno', 'professor', 'ca_projeto'],
-                          displayItems: [t.t('papel_aluno'), t.t('papel_professor'), t.t('papel_ca')],
-                          onChanged: estaCarregando ? null : (v) {
-                            if (v != null) {
-                              setState(() {
-                                _papelSelecionado = v;
-                                _raOuIdController.clear();
-                                _cursoController.clear();
-                                _dataNascimento = null;
-                                _dataNascimentoController.clear();
-                                _tipoIdentificacao = null;
-                              });
-                            }
-                          },
-                          textColor: textColor,
-                          subTextColor: subTextColor,
-                          fillColor: fillColor,
-                          dropdownColor: dropdownColor,
-                        ),
+                        _buildStyledDropdown(label: t.t('cadastro_papel_label'), value: _papelSelecionado, items: ['aluno', 'professor', 'ca_projeto'], displayItems: [t.t('papel_aluno'), t.t('papel_professor'), t.t('papel_ca')], onChanged: estaCarregando ? null : (v) { if (v != null) { setState(() { _papelSelecionado = v; _raOuIdController.clear(); _cursoController.clear(); _dataNascimento = null; _dataNascimentoController.clear(); _tipoIdentificacao = null; }); } }, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor, dropdownColor: dropdownColor),
                         const SizedBox(height: 20),
-
                         _buildStyledTextField(controller: _nomeController, label: t.t('cadastro_nome_label'), hint: 'John Doe', enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                         const SizedBox(height: 20),
 
@@ -234,69 +236,24 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         ],
 
                         if (_papelSelecionado == 'aluno') ...[
-                          _buildStyledDropdown(
-                            label: t.t('cadastro_curso'),
-                            value: _cursoController.text.isEmpty ? null : _cursoController.text,
-                            items: AppLocalizations.cursos,
-                            onChanged: estaCarregando ? null : (v) { if (v != null) setState(() => _cursoController.text = v); },
-                            textColor: textColor,
-                            subTextColor: subTextColor,
-                            fillColor: fillColor,
-                            dropdownColor: dropdownColor,
-                          ),
+                          _buildStyledDropdown(label: t.t('cadastro_curso'), value: _cursoController.text.isEmpty ? null : _cursoController.text, items: AppLocalizations.cursos, onChanged: estaCarregando ? null : (v) { if (v != null) setState(() => _cursoController.text = v); }, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor, dropdownColor: dropdownColor),
                           const SizedBox(height: 20),
                           _buildStyledTextField(controller: _raOuIdController, label: t.t('cadastro_ra_label'), hint: '123456', inputType: TextInputType.number, enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
-                          GestureDetector(
-                            onTap: estaCarregando ? null : _selecionarDataNascimento,
-                            child: AbsorbPointer(child: _buildStyledTextField(controller: _dataNascimentoController, label: t.t('cadastro_data_nasc_label'), hint: 'dd/mm/aaaa', suffixIcon: Icon(Icons.calendar_today, color: subTextColor, size: 18), textColor: textColor, subTextColor: subTextColor, fillColor: fillColor)),
-                          ),
+                          GestureDetector(onTap: estaCarregando ? null : _selecionarDataNascimento, child: AbsorbPointer(child: _buildStyledTextField(controller: _dataNascimentoController, label: t.t('cadastro_data_nasc_label'), hint: 'dd/mm/aaaa', suffixIcon: Icon(Icons.calendar_today, color: subTextColor, size: 18), textColor: textColor, subTextColor: subTextColor, fillColor: fillColor))),
                         ] else ...[
-                           _buildStyledDropdown(
-                            label: t.t('cadastro_identificacao_prof'),
-                            value: _tipoIdentificacao,
-                            items: _opcoesIdentificacao,
-                            onChanged: estaCarregando ? null : (v) => setState(() => _tipoIdentificacao = v),
-                            textColor: textColor,
-                            subTextColor: subTextColor,
-                            fillColor: fillColor,
-                            dropdownColor: dropdownColor,
-                           ),
+                           _buildStyledDropdown(label: t.t('cadastro_identificacao_prof'), value: _tipoIdentificacao, items: _opcoesIdentificacao, onChanged: estaCarregando ? null : (v) => setState(() => _tipoIdentificacao = v), textColor: textColor, subTextColor: subTextColor, fillColor: fillColor, dropdownColor: dropdownColor),
                            const SizedBox(height: 20),
                            _buildStyledTextField(controller: _raOuIdController, label: t.t('cadastro_num_prof'), hint: '123456', enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                         ],
 
                         const SizedBox(height: 40),
 
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: estaCarregando ? null : _submit,
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryPurple, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 5),
-                            child: estaCarregando ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(widget.isInitialSetup ? t.t('aluno_perfil_salvar') : t.t('cadastro_botao'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-                          ),
-                        ),
+                        SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: estaCarregando ? null : _submit, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryPurple, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 5), child: estaCarregando ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : Text(widget.isInitialSetup ? t.t('aluno_perfil_salvar') : t.t('cadastro_botao'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)))),
                         
                         if (!widget.isInitialSetup) ...[
                           const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: OutlinedButton(
-                              onPressed: estaCarregando ? null : _googleSignUp,
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: subTextColor.withOpacity(0.5)), 
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), 
-                                foregroundColor: textColor
-                              ),
-                              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Image.asset('assets/images/google_logo.png', height: 24),
-                                const SizedBox(width: 12),
-                                Text('Sign up with Google', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500)),
-                              ]),
-                            ),
-                          ),
+                          SizedBox(width: double.infinity, height: 50, child: OutlinedButton(onPressed: estaCarregando ? null : _googleSignUp, style: OutlinedButton.styleFrom(side: BorderSide(color: subTextColor.withOpacity(0.5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), foregroundColor: textColor), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Image.asset('assets/images/google_logo.png', height: 24), const SizedBox(width: 12), Text('Sign up with Google', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500))]))),
                         ]
                       ],
                     ),
@@ -305,27 +262,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
               ),
             ),
           ),
-
-          if (isDesktop)
-            Expanded(
-              flex: 5,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF8C52FF),
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF9D5CFF), Color(0xFF8C52FF)]),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Join the\nCommunity', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
-                      const SizedBox(height: 40),
-                      ConstrainedBox(constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400), child: const Icon(Icons.group_add_rounded, size: 200, color: Colors.white24)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          if (isDesktop) Expanded(flex: 5, child: Container(color: AppColors.primaryPurple, child: const Center(child: Icon(Icons.group_add_rounded, size: 200, color: Colors.white24)))),
         ],
       ),
     );
@@ -335,21 +272,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500)),
       const SizedBox(height: 8),
-      TextFormField(
-        controller: controller, obscureText: isObscure, keyboardType: inputType, enabled: enabled, style: TextStyle(color: textColor),
-        validator: validator ?? (v) => (v == null || v.isEmpty) ? 'Required' : null,
-        decoration: InputDecoration(
-          hintText: hint, 
-          hintStyle: TextStyle(color: subTextColor.withOpacity(0.5)),
-          filled: true, 
-          fillColor: fillColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))),
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)),
-          errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent)),
-          suffixIcon: suffixIcon
-        ),
-      ),
+      TextFormField(controller: controller, obscureText: isObscure, keyboardType: inputType, enabled: enabled, style: TextStyle(color: textColor), validator: validator ?? (v) => (v == null || v.isEmpty) ? 'Required' : null, decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: subTextColor.withOpacity(0.5)), filled: true, fillColor: fillColor, contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)), errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent)), suffixIcon: suffixIcon)),
     ]);
   }
 
@@ -357,23 +280,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500)),
       const SizedBox(height: 8),
-      DropdownButtonFormField<String>(
-        value: value,
-        items: List.generate(items.length, (index) => DropdownMenuItem(value: items[index], child: Text(displayItems != null ? displayItems[index] : items[index], style: TextStyle(color: textColor)))),
-        onChanged: onChanged,
-        dropdownColor: dropdownColor,
-        style: TextStyle(color: textColor),
-        iconEnabledColor: subTextColor,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: fillColor,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))),
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)),
-          errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent)),
-        ),
-        validator: (v) => v == null ? 'Required' : null,
-      ),
+      DropdownButtonFormField<String>(value: value, items: List.generate(items.length, (index) => DropdownMenuItem(value: items[index], child: Text(displayItems != null ? displayItems[index] : items[index], style: TextStyle(color: textColor)))), onChanged: onChanged, dropdownColor: dropdownColor, style: TextStyle(color: textColor), iconEnabledColor: subTextColor, decoration: InputDecoration(filled: true, fillColor: fillColor, contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)), errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent))), validator: (v) => v == null ? 'Required' : null),
     ]);
   }
 }

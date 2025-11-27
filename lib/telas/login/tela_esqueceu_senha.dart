@@ -1,10 +1,9 @@
-// lib/telas/login/tela_esqueceu_senha.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../l10n/app_localizations.dart';
-import '../../themes/app_theme.dart'; // Cores
+import '../../themes/app_theme.dart';
 
 class TelaEsqueceuSenha extends ConsumerStatefulWidget {
   const TelaEsqueceuSenha({super.key});
@@ -48,14 +47,22 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
+    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    final subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor, // CORRIGIDO
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: textColor), 
+          onPressed: () => Navigator.pop(context)
+        ),
       ),
       extendBodyBehindAppBar: true,
       body: Row(
@@ -79,20 +86,20 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
                         ),
                         const SizedBox(height: 24),
                         
-                        Text(t.t('esqueceu_titulo'), style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text(t.t('esqueceu_titulo'), style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: textColor)),
                         const SizedBox(height: 8),
-                        Text(t.t('esqueceu_subtitulo'), style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textGrey)),
+                        Text(t.t('esqueceu_subtitulo'), style: GoogleFonts.poppins(fontSize: 14, color: subTextColor)),
                         const SizedBox(height: 40),
 
                         TextFormField(
                           controller: _emailController,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: textColor),
                           decoration: InputDecoration(
                             labelText: t.t('login_email'),
-                            prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                            prefixIcon: Icon(Icons.email_outlined, color: subTextColor),
                             filled: true,
                             fillColor: Colors.transparent,
-                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade800)),
+                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))),
                             focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)),
                           ),
                         ),
@@ -120,10 +127,10 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text("${t.t('esqueceu_voltar_login')} ", style: const TextStyle(color: AppColors.textGrey, fontSize: 13)),
+                            Text("${t.t('esqueceu_voltar_login')} ", style: TextStyle(color: subTextColor, fontSize: 13)),
                             GestureDetector(
                               onTap: () => Navigator.pop(context),
-                              child: Text(t.t('esqueceu_login_link'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              child: Text(t.t('esqueceu_login_link'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13)),
                             ),
                           ],
                         ),

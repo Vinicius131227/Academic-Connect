@@ -1,4 +1,3 @@
-// lib/telas/aluno/tela_solicitar_adaptacao.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/provedores_app.dart';
@@ -13,7 +12,6 @@ import 'dart:io';
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../comum/animacao_fadein_lista.dart';
 
 class TelaSolicitarAdaptacao extends ConsumerStatefulWidget {
   const TelaSolicitarAdaptacao({super.key});
@@ -35,55 +33,32 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
     super.dispose();
   }
 
-  // --- FUNÇÕES LÓGICAS QUE FALTAVAM ---
-
   Future<void> _pegarArquivo() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'png'],
-      );
+      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'jpg', 'png']);
       if (result != null) {
         setState(() {
-          // Correção para Web: Em Web o path pode ser nulo, mas bytes não.
-          // Mas para este exemplo vamos assumir mobile ou tratar no serviço
-          if (result.files.single.path != null) {
-             _arquivoSelecionado = File(result.files.single.path!);
-          }
+          // Workaround seguro para web/mobile
+          if (result.files.single.path != null) _arquivoSelecionado = File(result.files.single.path!);
         });
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao selecionar arquivo: $e')),
-        );
-      }
-    }
+    } catch (e) { /* Ignora */ }
   }
 
   Future<void> _enviarSolicitacao() async {
     if (!_formKey.currentState!.validate() || _turmaSelecionada == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos obrigatórios.'), backgroundColor: Colors.red),
-      );
-      return;
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preencha os campos.'), backgroundColor: Colors.red));
+       return;
     }
     
     final usuario = ref.read(provedorNotificadorAutenticacao).usuario;
-    if (usuario == null || usuario.alunoInfo == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro: Não foi possível identificar o aluno.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    if (usuario == null) return;
 
     setState(() => _isLoading = true);
     
     String? nomeAnexo;
     try {
-      if (_arquivoSelecionado != null) {
-        nomeAnexo = _arquivoSelecionado!.path.split(Platform.pathSeparator).last;
-      }
+      if (_arquivoSelecionado != null) nomeAnexo = _arquivoSelecionado!.path.split(Platform.pathSeparator).last;
 
       final novaSolicitacao = SolicitacaoAluno(
         id: '', 
@@ -104,36 +79,34 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
       await ref.read(servicoFirestoreProvider).adicionarSolicitacao(novaSolicitacao);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Solicitação enviada com sucesso!'), backgroundColor: Colors.green),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enviado com sucesso!'), backgroundColor: Colors.green));
         Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red));
     } finally {
-       if (mounted) {
-         setState(() => _isLoading = false);
-       }
+       if (mounted) setState(() => _isLoading = false);
     }
   }
-  // --- FIM DAS FUNÇÕES ---
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final asyncTurmas = ref.watch(provedorStreamTurmasAluno);
+    
+    // TEMA
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final isDark = theme.brightness == Brightness.dark;
+    final inputFill = isDark ? AppColors.surfaceDark : Colors.white;
+    final borderColor = isDark ? Colors.white10 : Colors.black12;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(t.t('adaptacao_titulo'), style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        title: Text(t.t('adaptacao_titulo'), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: textColor),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -142,7 +115,6 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Aviso
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -154,27 +126,28 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
                   children: [
                     const Icon(Icons.info_outline, color: AppColors.primaryPurple),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(t.t('adaptacao_aviso'), style: const TextStyle(color: Colors.white70))),
+                    Expanded(child: Text(t.t('adaptacao_aviso'), style: TextStyle(color: textColor?.withOpacity(0.8)))),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Dropdown Turma
+              // Dropdown
               asyncTurmas.when(
                 loading: () => const LinearProgressIndicator(),
                 error: (_,__) => const Text("Erro ao carregar"),
                 data: (turmas) => DropdownButtonFormField<TurmaProfessor>(
                   value: _turmaSelecionada,
-                  dropdownColor: AppColors.surface,
-                  style: const TextStyle(color: Colors.white),
+                  dropdownColor: inputFill,
+                  style: TextStyle(color: textColor),
                   decoration: InputDecoration(
                     labelText: t.t('adaptacao_disciplina'),
                     filled: true,
-                    fillColor: AppColors.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: inputFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
                   ),
-                  items: turmas.map((t) => DropdownMenuItem(value: t, child: Text(t.nome))).toList(),
+                  items: turmas.map((t) => DropdownMenuItem(value: t, child: Text(t.nome, style: TextStyle(color: textColor)))).toList(),
                   onChanged: (v) => setState(() => _turmaSelecionada = v),
                 ),
               ),
@@ -183,14 +156,15 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
               // Descrição
               TextFormField(
                 controller: _descricaoController,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: textColor),
                 maxLines: 5,
                 decoration: InputDecoration(
                   labelText: t.t('adaptacao_descricao'),
                   filled: true,
-                  fillColor: AppColors.surface,
+                  fillColor: inputFill,
                   alignLabelWithHint: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
                 ),
                 validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
               ),
@@ -198,14 +172,14 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
 
               // Botão Anexo
               OutlinedButton.icon(
-                icon: Icon(_arquivoSelecionado == null ? Icons.attach_file : Icons.check_circle, color: _arquivoSelecionado == null ? Colors.white : AppColors.success),
+                icon: Icon(_arquivoSelecionado == null ? Icons.attach_file : Icons.check_circle, color: _arquivoSelecionado == null ? textColor : AppColors.success),
                 label: Text(
                   _arquivoSelecionado == null ? t.t('adaptacao_anexar') : 'Arquivo Selecionado',
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: textColor),
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: const BorderSide(color: Colors.white24),
+                  side: BorderSide(color: borderColor),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: _pegarArquivo, 
@@ -220,7 +194,7 @@ class _TelaSolicitarAdaptacaoState extends ConsumerState<TelaSolicitarAdaptacao>
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : Text(t.t('adaptacao_enviar'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : Text(t.t('adaptacao_enviar'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
             ],
           ),
