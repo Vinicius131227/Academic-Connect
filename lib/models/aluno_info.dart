@@ -1,13 +1,12 @@
 // lib/models/aluno_info.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Um modelo de dados para as informações específicas de um aluno.
+/// Modelo que agrupa as informações acadêmicas específicas de um aluno.
 class AlunoInfo {
   final String nomeCompleto;
-  final String ra;
+  final String ra; // Registro Acadêmico
   final String curso;
-  final double cr;
-  final String status;
+  final double cr; // Coeficiente de Rendimento
+  final String status; // Ex: Regular, Trancado
   final DateTime? dataNascimento;
 
   AlunoInfo({
@@ -19,21 +18,7 @@ class AlunoInfo {
     this.dataNascimento,
   });
 
-  /// Construtor de fábrica para criar a partir de um [Map] (vindo do Firestore).
-  factory AlunoInfo.fromMap(Map<String, dynamic> data) {
-    return AlunoInfo(
-      nomeCompleto: data['nomeCompleto'] ?? '',
-      ra: data['ra'] ?? '',
-      curso: data['curso'] ?? '',
-      cr: (data['cr'] ?? 0.0).toDouble(),
-      status: data['status'] ?? 'Regular',
-      dataNascimento: data['dataNascimento'] == null
-          ? null
-          : (data['dataNascimento'] as Timestamp).toDate(),
-    );
-  }
-
-  /// Converte este objeto para um [Map] para ser salvo no Firestore.
+  /// Converte para Mapa (Salvar no Firestore)
   Map<String, dynamic> toMap() {
     return {
       'nomeCompleto': nomeCompleto,
@@ -41,28 +26,21 @@ class AlunoInfo {
       'curso': curso,
       'cr': cr,
       'status': status,
-      'dataNascimento': dataNascimento != null
-          ? Timestamp.fromDate(dataNascimento!)
-          : null,
+      'dataNascimento': dataNascimento?.toIso8601String(),
     };
   }
 
-  /// Cria uma cópia do [AlunoInfo] com valores atualizados.
-  AlunoInfo copyWith({
-    String? nomeCompleto,
-    String? ra,
-    String? curso,
-    double? cr,
-    String? status,
-    DateTime? dataNascimento,
-  }) {
+  /// Cria objeto a partir do Mapa (Ler do Firestore)
+  factory AlunoInfo.fromMap(Map<String, dynamic> map) {
     return AlunoInfo(
-      nomeCompleto: nomeCompleto ?? this.nomeCompleto,
-      ra: ra ?? this.ra,
-      curso: curso ?? this.curso,
-      cr: cr ?? this.cr,
-      status: status ?? this.status,
-      dataNascimento: dataNascimento ?? this.dataNascimento,
+      nomeCompleto: map['nomeCompleto'] ?? '',
+      ra: map['ra'] ?? '',
+      curso: map['curso'] ?? '',
+      cr: (map['cr'] as num?)?.toDouble() ?? 0.0,
+      status: map['status'] ?? 'Regular',
+      dataNascimento: map['dataNascimento'] != null 
+          ? DateTime.tryParse(map['dataNascimento']) 
+          : null,
     );
   }
 }

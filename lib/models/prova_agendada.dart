@@ -1,12 +1,12 @@
+// lib/models/prova_agendada.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Representa uma avaliação (prova, trabalho) agendada.
-/// Armazenado na coleção 'provas'.
+/// Representa um evento no calendário (Prova ou Trabalho).
 class ProvaAgendada {
-  final String id; // ID do documento no Firestore
-  final String turmaId; // ID da turma (para filtrar)
-  final String titulo; // Ex: "P1", "Trabalho Final"
-  final String disciplina; // Nome da disciplina (para exibição)
+  final String id;
+  final String turmaId;
+  final String titulo;     // Ex: P1
+  final String disciplina; // Nome da matéria para exibição rápida
   final DateTime dataHora;
   final String predio;
   final String sala;
@@ -23,32 +23,28 @@ class ProvaAgendada {
     required this.conteudo,
   });
 
-  /// Construtor de fábrica para criar a partir de um [Map] (lido do Firestore)
-  factory ProvaAgendada.fromMap(Map<String, dynamic> data, String documentId) {
-    return ProvaAgendada(
-      id: documentId,
-      turmaId: data['turmaId'] ?? '',
-      titulo: data['titulo'] ?? '',
-      disciplina: data['disciplina'] ?? '',
-      // Converte o Timestamp do Firestore para DateTime do Dart
-      dataHora: (data['dataHora'] as Timestamp).toDate(),
-      predio: data['predio'] ?? '',
-      sala: data['sala'] ?? '',
-      conteudo: data['conteudo'] ?? '',
-    );
-  }
-
-  /// Converte este objeto para um [Map] (para salvar no Firestore)
   Map<String, dynamic> toMap() {
     return {
       'turmaId': turmaId,
       'titulo': titulo,
       'disciplina': disciplina,
-      // Converte o DateTime do Dart para Timestamp do Firestore
       'dataHora': Timestamp.fromDate(dataHora),
       'predio': predio,
       'sala': sala,
       'conteudo': conteudo,
     };
+  }
+
+  factory ProvaAgendada.fromMap(Map<String, dynamic> map, String id) {
+    return ProvaAgendada(
+      id: id,
+      turmaId: map['turmaId'] ?? '',
+      titulo: map['titulo'] ?? '',
+      disciplina: map['disciplina'] ?? '',
+      dataHora: (map['dataHora'] as Timestamp).toDate(),
+      predio: map['predio'] ?? '',
+      sala: map['sala'] ?? '',
+      conteudo: map['conteudo'] ?? '',
+    );
   }
 }

@@ -1,53 +1,69 @@
 import 'package:flutter/material.dart';
-import 'dart:ui'; // Para o BackdropFilter
-import '../../l10n/app_localizations.dart'; // Importa i18n
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+import '../../themes/app_theme.dart';
 
+/// Caso de uso para o Widgetbook: Visualizar o Loading com texto padrão.
+@UseCase(
+  name: 'Loading Padrão',
+  type: WidgetCarregamento,
+)
+Widget buildLoadingPadrao(BuildContext context) {
+  return const Scaffold(
+    body: Center(child: WidgetCarregamento()),
+  );
+}
+
+/// Caso de uso para o Widgetbook: Visualizar o Loading com texto personalizado.
+@UseCase(
+  name: 'Loading com Mensagem',
+  type: WidgetCarregamento,
+)
+Widget buildLoadingMensagem(BuildContext context) {
+  return const Scaffold(
+    body: Center(child: WidgetCarregamento(texto: "Processando dados...")),
+  );
+}
+
+/// Widget de carregamento padronizado para todo o aplicativo.
+///
+/// Exibe um [CircularProgressIndicator] na cor primária e um texto opcional abaixo.
+/// Adapta-se automaticamente ao tema claro/escuro.
 class WidgetCarregamento extends StatelessWidget {
-  final String texto;
-  const WidgetCarregamento({super.key, this.texto = ''}); // Texto padrão vazio
+  /// Texto opcional para exibir abaixo do spinner (ex: "Aguarde...").
+  final String? texto;
+  
+  const WidgetCarregamento({super.key, this.texto});
 
   @override
   Widget build(BuildContext context) {
-    // Se nenhum texto for passado, usa a tradução padrão
-    final textoCarregando = texto.isEmpty ? (AppLocalizations.of(context)?.t('artigos_carregando') ?? 'Carregando...') : texto;
-    
+    // Obtém o tema atual para definir cores de contraste
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : Colors.black54;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(
-            strokeWidth: 3,
-            color: Theme.of(context).colorScheme.primary,
+          // Indicador de progresso circular
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryPurple),
           ),
-          const SizedBox(height: 20),
-          Text(textoCarregando, style: Theme.of(context).textTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}
-
-// Widget de tela inteira (para usar no AuthGate)
-class TelaCarregamento extends StatelessWidget {
-  const TelaCarregamento({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // Fundo levemente borrado para um loading mais "premium"
-      body: Stack(
-        children: [
-          // Coloque um fundo se quiser (ex: imagem)
-          // Container(decoration: BoxDecoration(image: ...)),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-              child: Container(
-                color: Colors.black.withOpacity(0.1),
+          
+          // Se houver texto, exibe com espaçamento
+          if (texto != null && texto!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              texto!,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const WidgetCarregamento(),
+          ],
         ],
       ),
     );

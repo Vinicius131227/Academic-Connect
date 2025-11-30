@@ -1,89 +1,82 @@
-// widgetbook/main.dart
+// lib/widgetbook/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
-import 'package:widgetbook_annotation/widgetbook_annotation.dart' as anno;
-
-// Importa os TEMAS REAIS do seu app
-import 'package:ddm_projeto_final/themes/app_theme.dart';
-// Importa as LOCALIZAÇÕES REAIS do seu app
-import 'package:ddm_projeto_final/l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-// Importa o arquivo que SERÁ GERADO pelo build_runner
-import '../../widgetbook/main.directories.g.dart';
+// Importações de Tema e Localização
+import '../themes/app_theme.dart';
+import '../l10n/app_localizations.dart';
 
+// Importações dos Casos de Uso (Módulos)
+import 'use_cases_auth.dart';
+import 'use_cases_app.dart';
+
+/// Função principal para rodar o Widgetbook.
+/// Execute com: flutter run -t lib/widgetbook/main.dart -d chrome
 void main() {
   runApp(const WidgetbookApp());
 }
 
-@anno.App()
+/// A classe principal do Widgetbook.
+/// Configura o ambiente de teste visual (temas, dispositivos, localização).
 class WidgetbookApp extends StatelessWidget {
   const WidgetbookApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // --- Temas estáticos para teste ---
-    final teaTheme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF8B4513),
-        brightness: Brightness.light,
-      ),
-      primaryColor: const Color(0xFF8B4513),
-      scaffoldBackgroundColor: const Color(0xFFF5E6D3),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF8B4513),
-        foregroundColor: Colors.white,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF8B4513),
-          foregroundColor: Colors.white,
-        ),
-      ),
-    );
-
-    final purpleTheme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.purpleAccent,
-        brightness: Brightness.light,
-      ),
-    );
-    // ----------------------------------
-
     return Widgetbook.material(
-      // 'directories' será gerado no próximo passo
-      directories: directories,
-      
+      // --- 1. ADDONS (Ferramentas Laterais) ---
       addons: [
-        ViewportAddon(Viewports.all),
-        InspectorAddon(),
-        GridAddon(20),
-        AlignmentAddon(),
-        TextScaleAddon(scales: [1.0, 1.2, 2.0]),
-        ZoomAddon(),
-
+        // Troca de Tema (Claro / Escuro)
         MaterialThemeAddon(
           themes: [
-            WidgetbookTheme(name: 'App Claro', data: AppTheme.lightTheme),
-            WidgetbookTheme(name: 'App Escuro', data: AppTheme.darkTheme),
-            WidgetbookTheme(name: 'Tea', data: teaTheme),
-            WidgetbookTheme(name: 'Purple', data: purpleTheme),
+            WidgetbookTheme(name: 'Claro', data: AppTheme.lightTheme),
+            WidgetbookTheme(name: 'Escuro', data: AppTheme.darkTheme),
           ],
         ),
 
-        // --- CORREÇÃO AQUI ---
-        // API correta para Widgetbook 3.19+
+        // Troca de Idioma (PT / EN / ES)
         LocalizationAddon(
           locales: AppLocalizations.supportedLocales,
-          initialLocale: AppLocalizations.supportedLocales.first,
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          initialLocale: const Locale('pt'),
         ),
-        // ---------------------
+
+        // Simulação de Dispositivos
+        DeviceFrameAddon(
+          devices: [
+            Devices.ios.iPhone13,
+            Devices.ios.iPadPro11Inches,
+            Devices.android.samsungGalaxyS20,
+            Devices.macOS.macBookPro,
+          ],
+        ),
+        
+        // Escala de Texto (Acessibilidade)
+        TextScaleAddon(
+          scales: [1.0, 1.5, 2.0],
+        ),
+      ],
+
+      // --- 2. DIRETÓRIOS (Menu Lateral) ---
+      directories: [
+        // Categoria: Autenticação (Login, Cadastro...)
+        WidgetbookCategory(
+          name: 'Autenticação',
+          children: authUseCases, // Importado de use_cases_auth.dart
+        ),
+
+        // Categoria: Aplicação Principal (Aluno, Prof, CA...)
+        WidgetbookCategory(
+          name: 'Aplicação',
+          children: appUseCases, // Importado de use_cases_app.dart
+        ),
       ],
     );
   }

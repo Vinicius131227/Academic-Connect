@@ -1,12 +1,13 @@
 // lib/models/atividade_evento.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Sub-evento (Palestra, Workshop) dentro de um Evento principal.
 class AtividadeEvento {
   final String id;
-  final String nome; // "Palestra 1", "Minicurso A"
+  final String nome;
   final DateTime dataHora;
   final String local;
-  final List<String> presentes; // UIDs dos alunos presentes
+  final List<String> presentes;
 
   AtividadeEvento({
     required this.id,

@@ -56,7 +56,7 @@ class AppLocalizations {
   // --- DICIONÁRIO GLOBAL DE TRADUÇÕES ---
   static final Map<String, Map<String, String>> _valores = {
     // =========================================================================
-    // 🇧🇷 PORTUGUÊS (PT)
+    // PORTUGUÊS
     // =========================================================================
     'pt': {
       // GERAL
@@ -390,7 +390,7 @@ class AppLocalizations {
     },
     
     // =========================================================================
-    // 🇺🇸 ENGLISH (EN)
+    // ENGLISH
     // =========================================================================
     'en': {
       'app_nome': 'Academic Connect',
@@ -709,7 +709,7 @@ class AppLocalizations {
       'erro_generico': 'Error.',
     },
     
-    // --- ESPANHOL (Completo) ---
+    // --- ESPANHOL ---
     'es': {
       'app_nome': 'Academic Connect',
       'login_titulo': 'Acceso',

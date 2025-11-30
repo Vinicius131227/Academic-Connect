@@ -1,25 +1,63 @@
 // lib/telas/professor/tela_cadastro_nfc_manual.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+
+// Importações internas
 import '../../models/turma_professor.dart';
-import '../../models/aluno_chamada.dart';
+import '../../models/aluno_chamada.dart'; 
 import '../../providers/provedor_professor.dart';
 import '../../services/servico_firestore.dart';
-import '../../l10n/app_localizations.dart';
-import '../comum/widget_carregamento.dart';
+import '../../l10n/app_localizations.dart'; // Traduções
+import '../comum/widget_carregamento.dart'; // Loading
 
+/// Caso de uso para o Widgetbook.
+/// Simula a tela de cadastro manual de NFC.
+@UseCase(
+  name: 'Cadastro NFC Manual (Prof)',
+  type: TelaCadastroNfcManual,
+)
+Widget buildTelaCadastroNfcManual(BuildContext context) {
+  return ProviderScope(
+    child: TelaCadastroNfcManual(
+      turma: TurmaProfessor(
+        id: 'mock', 
+        nome: 'Cálculo 1', 
+        horario: '', 
+        local: '', 
+        professorId: '', 
+        turmaCode: '', 
+        creditos: 4, 
+        alunosInscritos: []
+      ),
+    ),
+  );
+}
+
+/// Tela administrativa para o professor cadastrar manualmente o ID do cartão NFC de um aluno.
+///
+/// Fluxo:
+/// 1. Professor seleciona o aluno da lista da turma.
+/// 2. Professor digita o código UID do cartão (lido externamente).
+/// 3. Salva no banco de dados.
 class TelaCadastroNfcManual extends ConsumerStatefulWidget {
   final TurmaProfessor turma;
-  const TelaCadastroNfcManual({super.key, required this.turma});
+  
+  const TelaCadastroNfcManual({
+    super.key, 
+    required this.turma
+  });
 
   @override
-  ConsumerState<TelaCadastroNfcManual> createState() =>
-      _TelaCadastroNfcManualState();
+  ConsumerState<TelaCadastroNfcManual> createState() => _TelaCadastroNfcManualState();
 }
 
 class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
   final _formKey = GlobalKey<FormState>();
   final _nfcIdController = TextEditingController();
+  
+  // Estado local
   AlunoChamada? _alunoSelecionado;
   bool _isLoading = false;
 
@@ -29,7 +67,9 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
     super.dispose();
   }
 
+  /// Valida os dados e salva o vínculo no Firestore.
   Future<void> _salvarCartao() async {
+    // 1. Validação local
     if (!_formKey.currentState!.validate() || _alunoSelecionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -45,9 +85,11 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
 
     try {
       // Formata o ID para o padrão de armazenamento (Ex: 04:A1:B2:C3:D4:E5)
+      // Remove espaços e converte para maiúsculas para padronizar
       final nfcIdFormatado = _nfcIdController.text.replaceAll(' ', ':').toUpperCase();
       
-      // Chama o serviço para salvar o cartão no documento do aluno
+      // 2. Chama o serviço para salvar o cartão no documento do aluno
+      // Importante: Usa o ID do aluno selecionado, não do usuário logado
       await ref.read(servicoFirestoreProvider).salvarCartaoNFC(
             _alunoSelecionado!.id, // UID do aluno
             nfcIdFormatado,        // ID do cartão
@@ -56,11 +98,11 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
       if (mounted) {
          ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(t.t('nfc_manual_sucesso')),
+            content: Text(t.t('nfc_manual_sucesso')), // "Sucesso!"
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context); // Volta para o hub da disciplina
       }
 
     } catch (e) {
@@ -79,12 +121,13 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-    // Observa o provedor de alunos da turma
+    
+    // Observa o provedor de alunos da turma para popular o Dropdown
     final estadoAlunos = ref.watch(provedorChamadaManual(widget.turma.id));
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.t('nfc_manual_titulo')),
+        title: Text(t.t('nfc_manual_titulo')), // "Cadastro Manual de Cartão"
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -99,21 +142,25 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                   Text(widget.turma.nome, style: Theme.of(context).textTheme.titleLarge),
                   const Divider(height: 24),
                   
-                  // Bloco de Seleção de Aluno (Baseado no status de carregamento)
+                  // 1. Bloco de Seleção de Aluno (Baseado no status de carregamento)
+                  // Usa switch expression para lidar com os estados do provedor
                   switch (estadoAlunos.status) {
+                    // Carregando
                     StatusChamadaManual.ocioso || StatusChamadaManual.carregando =>
                       const WidgetCarregamento(texto: 'Carregando alunos...'),
                       
+                    // Erro
                     StatusChamadaManual.erro =>
                       const Center(child: Padding(
                         padding: EdgeInsets.all(16.0),
                         child: Text('Erro ao carregar lista de alunos.'),
                       )),
                       
+                    // Lista Pronta
                     StatusChamadaManual.pronto =>
                       DropdownButtonFormField<AlunoChamada>(
                         value: _alunoSelecionado,
-                        hint: Text(t.t('nfc_manual_selecionar_aluno')),
+                        hint: Text(t.t('nfc_manual_selecionar_aluno')), // "Selecione o Aluno"
                         decoration: InputDecoration(
                           labelText: t.t('nfc_manual_selecionar_aluno'),
                           border: const OutlineInputBorder(),
@@ -132,22 +179,27 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                   },
 
                   const SizedBox(height: 16),
+                  
+                  // 2. Campo de ID do Cartão
                   TextFormField(
                     controller: _nfcIdController,
                     decoration: InputDecoration(
-                      labelText: t.t('nfc_manual_id_cartao'),
+                      labelText: t.t('nfc_manual_id_cartao'), // "ID do Cartão (UID)"
                       hintText: 'Ex: 04:A1:B2:C3:D4:E5',
                       border: const OutlineInputBorder(),
                     ),
                     validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
                     enabled: !_isLoading,
                   ),
+                  
                   const SizedBox(height: 24),
+                  
+                  // 3. Botão Salvar
                   ElevatedButton.icon(
                     icon: _isLoading
                         ? Container(width: 20, height: 20, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.save),
-                    label: Text(_isLoading ? 'Salvando...' : t.t('nfc_manual_salvar')),
+                    label: Text(_isLoading ? 'Salvando...' : t.t('nfc_manual_salvar')), // "Vincular Cartão"
                     onPressed: _isLoading ? null : _salvarCartao,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),

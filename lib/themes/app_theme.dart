@@ -1,31 +1,74 @@
+// lib/themes/app_theme.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Classe que centraliza todas as cores usadas no aplicativo.
+/// Facilita a manutenção e garante consistência visual.
 class AppColors {
-  // CORES FIXAS
+  // ===========================================================================
+  // 1. PALETA DE IDENTIDADE VISUAL (Fixa)
+  // ===========================================================================
+  // Estas cores não mudam, independentemente do tema (Claro/Escuro).
+  
+  /// Roxo vibrante principal (Botões, Destaques, Ícones ativos).
   static const Color primaryPurple = Color(0xFF8C52FF); 
+  
+  /// Roxo secundário (Gradientes).
   static const Color secondaryPurple = Color(0xFF9D5CFF); 
-  static const Color cardYellow = Color(0xFFFBC02D);
-  static const Color cardOrange = Color(0xFFFF7043);
-  static const Color cardBlue = Color(0xFF42A5F5);
-  static const Color cardGreen = Color(0xFF66BB6A);
+  
+  // Cores para os cartões do Dashboard (Estilo "ToDoDo")
+  static const Color cardYellow = Color(0xFFFBC02D); // Amarelo
+  static const Color cardOrange = Color(0xFFFF7043); // Laranja
+  static const Color cardBlue = Color(0xFF42A5F5);   // Azul
+  static const Color cardGreen = Color(0xFF66BB6A);  // Verde
 
-  // DARK
+  // ===========================================================================
+  // 2. PALETA DO TEMA ESCURO (Dark Mode)
+  // ===========================================================================
+  
+  /// Fundo principal escuro (quase preto).
   static const Color backgroundDark = Color(0xFF181818); 
+  
+  /// Cor de superfície (Cards, Modais) no modo escuro.
   static const Color surfaceDark = Color(0xFF2C2C2C);    
+  
+  /// Texto padrão no modo escuro.
   static const Color textWhite = Colors.white;
+  
+  /// Texto secundário (dicas, legendas) no modo escuro.
   static const Color textGreyDark = Colors.white54;
 
-  // LIGHT
+  // ===========================================================================
+  // 3. PALETA DO TEMA CLARO (Light Mode)
+  // ===========================================================================
+  
+  /// Fundo principal claro (Branco Puro).
   static const Color backgroundLight = Color(0xFFFFFFFF); 
+  
+  /// Cor de superfície (Cards) no modo claro (Cinza muito suave).
   static const Color surfaceLight = Color(0xFFF5F5F5);    
+  
+  /// Texto padrão no modo claro (Preto suave).
   static const Color textBlack = Color(0xFF121212);       
+  
+  /// Texto secundário no modo claro.
   static const Color textGreyLight = Color(0xFF757575);   
+  
+  // ===========================================================================
+  // 4. CORES DE FEEDBACK (Erro/Sucesso)
+  // ===========================================================================
   
   static const Color error = Color(0xFFCF6679);
   static const Color success = Color(0xFF66BB6A);
 
-  // ALIASES DE COMPATIBILIDADE
+  // ===========================================================================
+  // 5. ALIASES DE COMPATIBILIDADE
+  // ===========================================================================
+  // Estes getters permitem que o código antigo (que chamava AppColors.background)
+  // continue funcionando sem quebrar. Por padrão, retornam as cores do tema ESCURO.
+  // O ideal é migrar as telas para usar Theme.of(context) para serem dinâmicas.
+  
   static const Color background = backgroundDark; 
   static const Color surface = surfaceDark;       
   static const Color inputFill = surfaceDark;
@@ -49,15 +92,22 @@ class AppColors {
   static const Color lightPrimary = primaryPurple;
 }
 
+/// Classe que define os temas (ThemeData) completos para o MaterialApp.
 class AppTheme {
-  // TEMA ESCURO
+  
+  // ===========================================================================
+  // TEMA ESCURO (Dark Mode)
+  // ===========================================================================
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      
+      // Cores principais
       scaffoldBackgroundColor: AppColors.backgroundDark,
       primaryColor: AppColors.primaryPurple,
       
+      // Esquema de cores completo do Material 3
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primaryPurple,
         onPrimary: Colors.white,
@@ -65,14 +115,16 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         background: AppColors.backgroundDark,
         error: AppColors.error,
-        onSurface: Colors.white,
+        onSurface: Colors.white, // Cor de texto/ícones sobre superfícies
       ),
 
+      // Tipografia Global (Poppins)
       textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).apply(
         bodyColor: AppColors.textWhite,
         displayColor: AppColors.textWhite,
       ),
       
+      // Barra superior transparente
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -85,6 +137,7 @@ class AppTheme {
         ),
       ),
 
+      // Barra de navegação inferior
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.backgroundDark,
         selectedItemColor: AppColors.primaryPurple,
@@ -94,8 +147,7 @@ class AppTheme {
         showUnselectedLabels: false,
       ),
       
-      // Sem CardTheme global para evitar erro de versão
-      
+      // Estilo padrão dos Botões
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryPurple,
@@ -107,15 +159,19 @@ class AppTheme {
         )
       ),
       
+      // Estilo dos Campos de Texto (Inputs)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceDark,
+        fillColor: AppColors.surfaceDark, // Fundo cinza escuro
         labelStyle: const TextStyle(color: Colors.white70),
         hintStyle: TextStyle(color: Colors.grey[600]),
+        
+        // Borda padrão (sem foco)
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), 
           borderSide: BorderSide(color: Colors.grey.shade800)
         ),
+        // Borda quando focado (Roxo)
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), 
           borderSide: const BorderSide(color: AppColors.primaryPurple)
@@ -126,14 +182,19 @@ class AppTheme {
     );
   }
 
-  // TEMA CLARO
+  // ===========================================================================
+  // TEMA CLARO (Light Mode)
+  // ===========================================================================
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.backgroundLight, 
+      
+      // Cores principais
+      scaffoldBackgroundColor: AppColors.backgroundLight, // Branco
       primaryColor: AppColors.primaryPurple,
 
+      // Esquema de cores completo
       colorScheme: const ColorScheme.light(
         primary: AppColors.primaryPurple,
         onPrimary: Colors.white,
@@ -141,14 +202,16 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         background: AppColors.backgroundLight,
         error: AppColors.error,
-        onSurface: AppColors.textBlack,
+        onSurface: AppColors.textBlack, // Texto preto sobre superfícies
       ),
 
+      // Tipografia (Preta)
       textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme).apply(
         bodyColor: AppColors.textBlack,
         displayColor: AppColors.textBlack,
       ),
 
+      // Barra superior
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -161,6 +224,7 @@ class AppTheme {
         ),
       ),
 
+      // Barra de navegação inferior
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.surfaceLight,
         selectedItemColor: AppColors.primaryPurple,
@@ -170,6 +234,7 @@ class AppTheme {
         showUnselectedLabels: false,
       ),
 
+      // Botões (Iguais ao dark, mas sempre roxos)
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryPurple,
@@ -181,15 +246,19 @@ class AppTheme {
         )
       ),
 
+      // Campos de Texto (Inputs) - Adaptados para fundo branco
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Colors.white, // Fundo branco
         labelStyle: const TextStyle(color: Colors.black54),
         hintStyle: const TextStyle(color: Colors.black38),
+        
+        // Borda cinza clara
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), 
           borderSide: const BorderSide(color: Colors.black12)
         ),
+        // Borda roxa no foco
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16), 
           borderSide: const BorderSide(color: AppColors.primaryPurple)

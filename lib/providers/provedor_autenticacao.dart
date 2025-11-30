@@ -1,19 +1,28 @@
+// lib/providers/provedor_autenticacao.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
+// Importa modelos e serviço de dados
 import '../models/usuario.dart';
 import '../models/aluno_info.dart';
 import '../services/servico_firestore.dart';
 
+/// Estados possíveis da autenticação no aplicativo.
+/// - [desconhecido]: App acabou de abrir, ainda verificando.
+/// - [autenticado]: Usuário logado e verificado.
+/// - [naoAutenticado]: Usuário saiu ou nunca entrou.
 enum StatusAutenticacao { desconhecido, autenticado, naoAutenticado }
 
+/// Classe imutável que guarda o estado atual da autenticação.
 class EstadoAutenticacao {
   final StatusAutenticacao status;
-  final UsuarioApp? usuario;
-  final bool carregando;
-  final String? erro;
+  final UsuarioApp? usuario; // Dados completos do usuário (incluindo perfil)
+  final bool carregando; // Se está processando login/cadastro
+  final String? erro; // Mensagem de erro para exibir na UI
 
   EstadoAutenticacao({
     this.status = StatusAutenticacao.desconhecido,
@@ -22,6 +31,7 @@ class EstadoAutenticacao {
     this.erro,
   });
 
+  // Método copyWith para facilitar a atualização do estado imutável
   EstadoAutenticacao copyWith({
     StatusAutenticacao? status,
     UsuarioApp? usuario,
@@ -33,35 +43,42 @@ class EstadoAutenticacao {
       status: status ?? this.status,
       usuario: limparUsuario ? null : (usuario ?? this.usuario),
       carregando: carregando ?? this.carregando,
-      erro: erro, // Se passar null, limpa o erro
+      erro: erro, // Se passar null, limpa o erro anterior
     );
   }
 }
 
+/// Notificador (Controller) que gerencia a lógica de autenticação.
+/// Usa o Firebase Auth e conecta com o Firestore para dados extras.
 class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final Ref _ref;
 
   NotificadorAutenticacao(this._ref)
       : super(EstadoAutenticacao(status: StatusAutenticacao.desconhecido)) {
+    // Inicia o monitoramento assim que o provedor é criado
     _checarStatusAutenticacao();
   }
 
-  // Monitora o estado do usuário no Firebase (Persistência)
+  /// Monitora o estado do usuário no Firebase (Persistência de Login).
+  /// Se o usuário fechar e abrir o app, isso garante que ele continue logado.
   Future<void> _checarStatusAutenticacao() async {
-    await Future.delayed(const Duration(seconds: 1)); // Pequeno delay para evitar flash
+    await Future.delayed(const Duration(seconds: 1)); // Pequeno delay visual
     _auth.authStateChanges().listen((User? user) async {
       if (user != null) {
-        // Usuário logado, busca dados no Firestore
+        // Usuário está logado no Firebase Auth.
+        // Agora buscamos os dados completos (perfil, papel) no Firestore.
         final usuarioApp = await _ref.read(servicoFirestoreProvider).getUsuario(user.uid);
 
         if (usuarioApp != null) {
+          // Usuário já tem cadastro completo
           state = EstadoAutenticacao(
             status: StatusAutenticacao.autenticado,
             usuario: usuarioApp,
           );
         } else {
-          // Usuário existe no Auth mas não no Firestore (ex: primeiro login Google)
+          // Usuário existe no Auth mas não no Firestore (ex: primeiro login com Google).
+          // Criamos um documento padrão para ele preencher depois.
           final novoUsuario = await _criarDocumentoUsuarioPadrao(
             uid: user.uid,
             email: user.email ?? '',
@@ -72,28 +89,28 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
           );
         }
       } else {
-        // Usuário deslogado
+        // Ninguém logado
         state = EstadoAutenticacao(status: StatusAutenticacao.naoAutenticado);
       }
     });
   }
 
-  // Login com Email e Senha
+  /// Realiza o login com E-mail e Senha.
   Future<void> login(String email, String password) async {
     try {
       state = state.copyWith(erro: null, carregando: true);
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      // O listener _checarStatusAutenticacao vai atualizar o estado automaticamente
+      // O listener _checarStatusAutenticacao cuidará de atualizar o estado global
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(carregando: false, erro: _traduzirErroAuth(e.code));
-      throw e; // Relança para a UI saber que falhou
+      throw e; // Repassa o erro para a tela exibir feedback
     } catch (e) {
       state = state.copyWith(carregando: false, erro: 'Erro inesperado: $e');
       throw e;
     }
   }
 
-  // Cadastro de Aluno
+  /// Cadastro de Aluno com dados completos.
   Future<void> signUp({
     required String email,
     required String password,
@@ -104,21 +121,24 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
   }) async {
     try {
       state = state.copyWith(erro: null, carregando: true);
+      // 1. Cria usuário no Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
       
       if (userCredential.user != null) {
         final user = userCredential.user!;
         
+        // 2. Cria o objeto de dados do aluno
         final info = AlunoInfo(
           nomeCompleto: nomeCompleto,
           ra: ra,
           curso: curso,
           dataNascimento: dataNascimento,
-          cr: 0.0,
+          cr: 0.0, // Inicia com CR zero
           status: 'Regular',
         );
         
+        // 3. Salva no Firestore
         final novoUsuario = UsuarioApp(
           uid: user.uid,
           email: user.email!,
@@ -139,13 +159,14 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
   
-  // Cadastro de Professor ou CA (Com Identificação Específica)
+  /// Cadastro de Professor ou CA (Com Identificação Específica).
+  /// Diferente do aluno, não pede curso nem data de nascimento no cadastro.
   Future<void> signUpComIdentificacao({
     required String email,
     required String password,
     required String papel,
     required String nomeCompleto,
-    required String identificacao,
+    required String identificacao, // Matrícula SIAPE ou ID Externo
     required String tipoIdentificacao,
   }) async {
     try {
@@ -162,7 +183,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
           papel: papel, 
           alunoInfo: AlunoInfo(
             nomeCompleto: nomeCompleto,
-            ra: identificacao, // Usa o campo RA para armazenar a ID
+            ra: identificacao, // Reutiliza o campo RA para armazenar a ID
             curso: '',
             cr: 0.0,
             status: '',
@@ -183,25 +204,25 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
-  // Login com Google
+  /// Login com Google (Compatível com Web e Mobile).
   Future<void> loginComGoogle() async {
     try {
       state = state.copyWith(erro: null, carregando: true);
       
       if (kIsWeb) {
-        // Web
+        // Fluxo Web (Popup)
         final GoogleAuthProvider googleProvider = GoogleAuthProvider();
         final userCredential = await _auth.signInWithPopup(googleProvider);
         if (userCredential.user != null) {
           await _processarLoginSucesso(userCredential.user!);
         }
       } else {
-        // Mobile
+        // Fluxo Mobile (Nativo)
         final GoogleSignIn googleSignIn = GoogleSignIn();
         final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
         
         if (googleUser == null) { 
-          // Usuário cancelou o login
+          // Usuário cancelou a janela de login
           state = state.copyWith(carregando: false);
           return;
         }
@@ -224,14 +245,14 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
           carregando: false, erro: 'Erro no login com Google: ${e.toString()}');
     }
   }
-
-  // Helper para login social
+  
+  /// Helper para verificar se o usuário do Google já existe no banco.
   Future<void> _processarLoginSucesso(User user) async {
     final servico = _ref.read(servicoFirestoreProvider);
     final usuarioExistente = await servico.getUsuario(user.uid);
     
     if (usuarioExistente == null) {
-      // Se é novo, cria doc padrão
+      // Se é novo, cria doc padrão (o papel ficará vazio até ele escolher na tela de cadastro)
       await _criarDocumentoUsuarioPadrao(
         uid: user.uid,
         email: user.email ?? '',
@@ -239,14 +260,14 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
-  // Atualizar Perfil
+  /// Atualiza o perfil do aluno (usado na tela de edição).
   Future<void> salvarPerfilAluno(AlunoInfo info) async {
     final user = state.usuario;
     if (user == null) return;
     
     try {
       await _ref.read(servicoFirestoreProvider).salvarPerfilAluno(user.uid, info);
-      // Atualiza o estado local
+      // Atualiza o estado local instantaneamente
       final usuarioAtualizado = user.copyWith(alunoInfo: info);
       state = state.copyWith(usuario: usuarioAtualizado);
     } catch (e) {
@@ -255,7 +276,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
-  // Definir Papel (Aluno/Prof/CA)
+  /// Define o papel do usuário (Aluno, Professor, CA) no primeiro acesso.
   Future<void> selecionarPapel(String papel, {String? tipoIdentificacao, String? numIdentificacao}) async {
     state = state.copyWith(carregando: true);
     final user = state.usuario;
@@ -267,7 +288,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
         tipoIdentificacao: tipoIdentificacao
       );
       
-      // Recarrega o usuário completo
+      // Recarrega o usuário completo do banco para garantir consistência
       final usuarioAtualizado = await _ref.read(servicoFirestoreProvider).getUsuario(user.uid);
       
       state = state.copyWith(
@@ -280,18 +301,18 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
-  // Logout
+  /// Sai da conta (Logout).
   Future<void> logout() async {
     await _auth.signOut();
     try {
       await GoogleSignIn().signOut();
     } catch (e) {
-      // Ignora se não estava logado com Google
+      // Ignora erro se não estava logado com Google
     }
-    // O listener _checarStatusAutenticacao vai mudar o estado para naoAutenticado
+    // O listener _checarStatusAutenticacao vai mudar o estado para naoAutenticado automaticamente
   }
 
-  // Cria doc vazio no Firestore
+  /// Cria documento vazio no Firestore para novos usuários.
   Future<UsuarioApp> _criarDocumentoUsuarioPadrao({required String uid, required String email}) async {
     final info = AlunoInfo(
       nomeCompleto: '',
@@ -315,14 +336,14 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     return novoUsuario;
   }
   
-  // Tradutor de Erros do Firebase
+  /// Traduz os códigos de erro técnicos do Firebase para mensagens amigáveis em Português.
   String _traduzirErroAuth(String code) {
     switch (code) {
       case 'user-not-found':
       case 'wrong-password':
-      case 'invalid-credential': // Código novo
+      case 'invalid-credential': // Novo código do Firebase (segurança)
       case 'INVALID_LOGIN_CREDENTIALS':
-        return 'E-mail ou senha inválidos.';
+        return 'E-mail ou senha incorretos.';
       case 'email-already-in-use':
         return 'Este e-mail já está cadastrado.';
       case 'weak-password':
@@ -342,6 +363,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
   }
 }
 
+/// O provedor global que será usado em todo o app.
 final provedorNotificadorAutenticacao =
     StateNotifierProvider<NotificadorAutenticacao, EstadoAutenticacao>((ref) {
   return NotificadorAutenticacao(ref);

@@ -1,59 +1,90 @@
+// lib/telas/comum/tela_alterar_senha.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../providers/provedor_autenticacao.dart';
-import '../../l10n/app_localizations.dart'; 
+import 'package:google_fonts/google_fonts.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-/// Tela para o usuário (já logado) solicitar a redefinição de senha.
-/// Esta tela envia um e-mail de redefinição para o usuário logado.
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
+
+/// Caso de uso para o Widgetbook.
+@UseCase(
+  name: 'Alterar Senha',
+  type: TelaAlterarSenha,
+)
+Widget buildTelaAlterarSenha(BuildContext context) {
+  return const ProviderScope(child: TelaAlterarSenha());
+}
+
+/// Tela para redefinição de senha do usuário logado.
+///
+/// Exige:
+/// 1. Senha Atual (para re-autenticação).
+/// 2. Nova Senha.
+/// 3. Confirmação da Nova Senha.
 class TelaAlterarSenha extends ConsumerStatefulWidget {
   const TelaAlterarSenha({super.key});
+
   @override
   ConsumerState<TelaAlterarSenha> createState() => _TelaAlterarSenhaState();
 }
 
 class _TelaAlterarSenhaState extends ConsumerState<TelaAlterarSenha> {
+  final _formKey = GlobalKey<FormState>();
+  final _atualController = TextEditingController();
+  final _novaController = TextEditingController();
+  final _confirmarController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _enviarLinkAlteracaoSenha() async {
+  @override
+  void dispose() {
+    _atualController.dispose();
+    _novaController.dispose();
+    _confirmarController.dispose();
+    super.dispose();
+  }
+
+  /// Lógica para atualizar a senha no Firebase.
+  Future<void> _atualizarSenha() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
+    final user = FirebaseAuth.instance.currentUser;
+    final t = AppLocalizations.of(context)!;
 
-    // Pega o email do usuário logado através do provedor de autenticação
-    final email = ref.read(provedorNotificadorAutenticacao).usuario?.email;
-
-    if (email == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro: Usuário não encontrado.'), backgroundColor: Colors.red),
-        );
-      }
-      setState(() => _isLoading = false);
-      return;
-    }
+    if (user == null) return;
 
     try {
-      // Chama o Firebase para enviar o email de redefinição
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      // 1. Re-autenticar o usuário (Segurança exigida pelo Firebase)
+      final cred = EmailAuthProvider.credential(
+        email: user.email!, 
+        password: _atualController.text
+      );
+      await user.reauthenticateWithCredential(cred);
+
+      // 2. Atualizar para a nova senha
+      await user.updatePassword(_novaController.text);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Link para alterar senha enviado para $email'),
-            backgroundColor: Colors.green,
-          ),
+          SnackBar(content: Text(t.t('sucesso')), backgroundColor: Colors.green)
         );
-        Navigator.of(context).pop();
+        Navigator.pop(context);
       }
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
+      String erro = t.t('erro_generico');
+      if (e.code == 'wrong-password') erro = 'Senha atual incorreta.';
+      if (e.code == 'weak-password') erro = 'A nova senha é muito fraca.';
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro ao enviar link.'), backgroundColor: Colors.red),
+          SnackBar(content: Text(erro), backgroundColor: Colors.red)
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -61,82 +92,98 @@ class _TelaAlterarSenhaState extends ConsumerState<TelaAlterarSenha> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final emailUsuario = ref.watch(provedorNotificadorAutenticacao).usuario?.email ?? '...';
+    final textColor = theme.textTheme.bodyLarge?.color;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(t.t('alterar_senha_titulo')),
+        title: Text(t.t('config_alterar_senha'), style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.bold)),
+        iconTheme: IconThemeData(color: textColor),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Column(
-          children: [
-            // Aviso
-            Card(
-              color: theme.colorScheme.secondaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.security, color: theme.colorScheme.onSecondaryContainer, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        t.t('alterar_senha_aviso_email'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer
-                        ),
-                      ),
-                    ),
-                  ],
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Ícone de cadeado
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryPurple.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.lock_outline, size: 40, color: AppColors.primaryPurple),
               ),
-            ),
-            // Formulário
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(t.t('login_email'), style: theme.textTheme.bodySmall),
-                    const SizedBox(height: 4),
-                    Text(emailUsuario, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 24),
-                    // Botões
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _isLoading ? null : () => Navigator.pop(context),
-                            child: Text(t.t('config_sair_dialog_cancelar')),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: _isLoading
-                              ? Container(width: 20, height: 20, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.send_outlined, size: 18),
-                            label: Text(_isLoading ? 'Enviando...' : t.t('esqueceu_senha_enviar')),
-                            onPressed: _isLoading ? null : _enviarLinkAlteracaoSenha,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              const SizedBox(height: 32),
+
+              // Campos
+              _buildPasswordField(
+                controller: _atualController, 
+                label: t.t('alterar_senha_atual'),
+                theme: theme,
+              ),
+              const SizedBox(height: 16),
+              _buildPasswordField(
+                controller: _novaController, 
+                label: t.t('alterar_senha_nova'),
+                theme: theme,
+              ),
+              const SizedBox(height: 16),
+              _buildPasswordField(
+                controller: _confirmarController, 
+                label: t.t('alterar_senha_confirmar'),
+                theme: theme,
+                validator: (val) {
+                  if (val != _novaController.text) return t.t('cadastro_erro_senha');
+                  return null;
+                }
+              ),
+              const SizedBox(height: 40),
+
+              // Botão Salvar
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _atualizarSenha,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryPurple,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isLoading 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(t.t('salvar'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-              ),
-            ),
-          ],
+              )
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller, 
+    required String label, 
+    required ThemeData theme,
+    String? Function(String?)? validator
+  }) {
+    final isDark = theme.brightness == Brightness.dark;
+    return TextFormField(
+      controller: controller,
+      obscureText: true,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: isDark ? AppColors.surfaceDark : Colors.white,
+        prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      validator: validator ?? (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
     );
   }
 }

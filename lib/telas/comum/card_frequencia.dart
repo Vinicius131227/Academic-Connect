@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../models/turma_professor.dart';
-import '../models/disciplina_frequencia.dart';
-import '../l10n/app_localizations.dart';
-import '../providers/provedor_autenticacao.dart';
-import '../services/servico_firestore.dart';
-import '../telas/aluno/tela_notas_avaliacoes.dart';
-import '../telas/aluno/tela_detalhes_disciplina_aluno.dart'; // Hub da disciplina
-import '../themes/app_theme.dart'; // Cores novas
+import '../../../models/turma_professor.dart';
+import '../../../models/disciplina_frequencia.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../providers/provedor_autenticacao.dart';
+import '../../../services/servico_firestore.dart';
+import '../aluno/tela_notas_avaliacoes.dart';
+import '../aluno/tela_detalhes_disciplina_aluno.dart'; // Hub da disciplina
+import '../../../themes/app_theme.dart'; // Cores novas
 
 // Provider local para ouvir as aulas dessa turma específica
 final aulasStreamProvider = StreamProvider.family<QuerySnapshot, String>((ref, turmaId) {

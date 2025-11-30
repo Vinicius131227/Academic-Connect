@@ -1,11 +1,12 @@
 // lib/services/servico_firestore.dart
+
 import 'dart:io'; 
 import 'dart:math'; 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart'; 
 
-// Importe todos os modelos
+// --- Importação dos Modelos de Dados ---
 import '../models/usuario.dart';
 import '../models/aluno_info.dart';
 import '../models/turma_professor.dart';
@@ -19,6 +20,8 @@ import '../models/material_aula.dart';
 import '../models/dica_aluno.dart';
 import '../models/atividade_evento.dart'; 
 
+/// Classe responsável por toda a comunicação com o Firebase Firestore.
+/// Centraliza as operações de leitura (GET), escrita (SET/UPDATE) e tempo real (STREAM).
 class ServicoFirestore {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -26,16 +29,20 @@ class ServicoFirestore {
   // 1. MÉTODOS DE USUÁRIO / AUTENTICAÇÃO
   // ===========================================================================
 
+  /// Busca os dados completos de um usuário pelo seu UID.
+  /// Retorna `null` se o usuário não existir no banco.
   Future<UsuarioApp?> getUsuario(String uid) async {
     final doc = await _db.collection('usuarios').doc(uid).get();
     if (!doc.exists || doc.data() == null) return null;
     return UsuarioApp.fromSnapshot(doc as DocumentSnapshot<Map<String, dynamic>>);
   }
 
+  /// Cria o documento inicial de um usuário após o cadastro.
   Future<void> criarDocumentoUsuario(UsuarioApp usuario) async {
     await _db.collection('usuarios').doc(usuario.uid).set(usuario.toMap());
   }
 
+  /// Atualiza o papel (Aluno/Prof/CA) e identificação (RA/SIAPE) do usuário.
   Future<void> selecionarPapel(String uid, String papel, {String? tipoIdentificacao}) async {
     await _db.collection('usuarios').doc(uid).update({
       'papel': papel,
@@ -43,21 +50,24 @@ class ServicoFirestore {
     });
   }
 
+  /// Atualiza os dados do perfil do aluno (Curso, Data Nasc, etc).
   Future<void> salvarPerfilAluno(String uid, AlunoInfo info) async {
     await _db.collection('usuarios').doc(uid).update({
       'alunoInfo': info.toMap(),
     });
   }
 
+  /// Vincula o ID do cartão NFC ao perfil do usuário.
   Future<void> salvarCartaoNFC(String uid, String nfcId) async {
     await _db.collection('usuarios').doc(uid).update({'nfcCardId': nfcId});
   }
 
   // ===========================================================================
-  // 2. MÉTODOS DE CONSULTA E LEITURA (Auxiliares)
+  // 2. MÉTODOS DE CONSULTA (AUXILIARES)
   // ===========================================================================
 
-  /// Busca aluno por cartão NFC (Usado na chamada presencial)
+  /// Busca qual aluno é dono de um determinado cartão NFC.
+  /// Usado pelo professor na hora da chamada presencial.
   Future<UsuarioApp?> getAlunoPorNFC(String nfcId) async {
     final query = await _db
         .collection('usuarios')
@@ -70,7 +80,8 @@ class ServicoFirestore {
     return UsuarioApp.fromSnapshot(query.docs.first as DocumentSnapshot<Map<String, dynamic>>);
   }
 
-  /// Busca lista de alunos para chamada manual e gestão
+  /// Retorna a lista de alunos inscritos em uma turma específica.
+  /// Útil para gerar a lista de chamada manual.
   Future<List<AlunoChamada>> getAlunosDaTurma(String turmaId) async {
     final turmaDoc = await _db.collection('turmas').doc(turmaId).get();
     if (!turmaDoc.exists) return [];
@@ -81,6 +92,7 @@ class ServicoFirestore {
     if (alunoUids.isEmpty) return [];
 
     List<AlunoChamada> alunos = [];
+    // Busca os dados de cada aluno inscrito (Nome, RA)
     for (String uid in alunoUids) {
         final doc = await _db.collection('usuarios').doc(uid).get();
         if (doc.exists) {
@@ -97,7 +109,8 @@ class ServicoFirestore {
     return alunos;
   }
   
-  /// Retorna dados da aula de um dia específico (para validação de presença retroativa)
+  /// Retorna os dados de aula (quem estava presente) de um dia específico.
+  /// Usado para validar se a chamada já foi feita.
   Future<Map<String, dynamic>?> getAulaPorDia(String turmaId, DateTime data) async {
     final dataString = DateFormat('yyyy-MM-dd').format(data);
     final doc = await _db
@@ -111,10 +124,12 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 3. STREAMS (Fluxos de Dados em Tempo Real)
+  // 3. STREAMS (DADOS EM TEMPO REAL)
   // ===========================================================================
 
   // --- PROFESSOR ---
+  
+  /// Lista todas as turmas criadas por um professor.
   Stream<List<TurmaProfessor>> getTurmasProfessor(String professorUid) {
     return _db
         .collection('turmas')
@@ -125,6 +140,7 @@ class ServicoFirestore {
             .toList());
   }
   
+  /// Lista solicitações pendentes (abono, adaptação) para o professor.
   Stream<List<SolicitacaoAluno>> getSolicitacoes(String professorUid) {
     return _db
         .collection('solicitacoes')
@@ -136,6 +152,8 @@ class ServicoFirestore {
   }
   
   // --- ALUNO ---
+  
+  /// Lista as turmas onde o aluno está matriculado.
   Stream<List<TurmaProfessor>> getTurmasAluno(String alunoUid) {
     return _db
         .collection('turmas')
@@ -146,6 +164,7 @@ class ServicoFirestore {
             .toList());
   }
 
+  /// Lista as notas lançadas para o aluno.
   Stream<List<DisciplinaNotas>> getNotasAluno(String alunoUid) {
     return _db
         .collection('notas') 
@@ -156,6 +175,7 @@ class ServicoFirestore {
             .toList());
   }
 
+  /// Lista o histórico de solicitações do aluno.
   Stream<List<SolicitacaoAluno>> getSolicitacoesAluno(String alunoUid) {
     return _db
         .collection('solicitacoes')
@@ -167,6 +187,7 @@ class ServicoFirestore {
             .toList());
   }
   
+  /// Monitora as aulas de uma turma (para atualizar a frequência em tempo real).
   Stream<QuerySnapshot> getAulasStream(String turmaId) {
     return _db
         .collection('turmas')
@@ -176,7 +197,9 @@ class ServicoFirestore {
         .snapshots();
   }
   
-  // --- GERAIS ---
+  // --- GERAIS (Calendário e Eventos) ---
+  
+  /// Retorna todas as provas agendadas no sistema.
   Stream<List<ProvaAgendada>> getCalendarioDeProvas() {
     return _db
         .collection('provas') 
@@ -187,6 +210,7 @@ class ServicoFirestore {
             .toList());
   }
   
+  /// Retorna todos os eventos do C.A.
   Stream<List<EventoCA>> getEventos() {
     return _db
         .collection('eventos')
@@ -223,6 +247,8 @@ class ServicoFirestore {
   }
 
   // --- MATERIAIS ---
+  
+  /// Materiais específicos de uma turma (postados pelo professor).
   Stream<List<MaterialAula>> getStreamMateriais(String turmaId) {
     return _db
         .collection('turmas')
@@ -235,9 +261,11 @@ class ServicoFirestore {
             .toList());
   }
   
+  /// Busca materiais antigos (provas, listas) de turmas passadas com o mesmo nome.
+  /// Ex: Mostra provas de "Cálculo 1" de 2023 para a turma de 2024.
   Stream<List<MaterialAula>> getMateriaisPorNomeBase(String nomeBase) {
     return _db
-        .collectionGroup('materiais') 
+        .collectionGroup('materiais') // Busca em TODAS as subcoleções 'materiais'
         .where('nomeBaseDisciplina', isEqualTo: nomeBase) 
         .orderBy('dataPostagem', descending: true)
         .snapshots()
@@ -246,18 +274,20 @@ class ServicoFirestore {
             .toList());
   }
 
-  // DRIVE GLOBAL: Busca todas as provas de todas as matérias
+  /// DRIVE GLOBAL: Busca TODAS as provas de TODAS as matérias.
+  /// Usado na tela "Drive de Provas".
   Stream<List<MaterialAula>> getTodosMateriaisTipoProva() {
     return _db.collectionGroup('materiais')
-        .where('tipo', isEqualTo: 'prova') 
+        .where('tipo', isEqualTo: 'prova') // Filtra apenas arquivos tipo Prova
         .orderBy('dataPostagem', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => MaterialAula.fromMap(d.data(), d.id)).toList());
   }
 
+  /// Professor adiciona material na turma.
   Future<void> adicionarMaterial(String turmaId, MaterialAula material, String nomeBaseDisciplina) async {
     final data = material.toMap();
-    data['nomeBaseDisciplina'] = nomeBaseDisciplina; 
+    data['nomeBaseDisciplina'] = nomeBaseDisciplina; // Salva o nome base para indexação global
     await _db
         .collection('turmas')
         .doc(turmaId)
@@ -275,6 +305,8 @@ class ServicoFirestore {
   }
 
   // --- DICAS ---
+  
+  /// Dicas postadas na turma atual.
   Stream<List<DicaAluno>> getStreamDicas(String turmaId) {
     return _db
         .collection('turmas')
@@ -287,6 +319,7 @@ class ServicoFirestore {
             .toList());
   }
 
+  /// Dicas de turmas passadas com o mesmo nome.
   Stream<List<DicaAluno>> getDicasPorNomeBase(String nomeBase) {
     return _db
         .collectionGroup('dicas') 
@@ -298,7 +331,7 @@ class ServicoFirestore {
             .toList());
   }
 
-  // DICAS GERAIS: Busca todas as dicas do sistema
+  /// DICAS GERAIS: Busca todas as dicas do sistema (Mural da Comunidade).
   Stream<List<DicaAluno>> getTodasDicasGlobais() {
     return _db.collectionGroup('dicas')
         .orderBy('dataPostagem', descending: true)
@@ -306,6 +339,7 @@ class ServicoFirestore {
         .map((s) => s.docs.map((d) => DicaAluno.fromMap(d.data(), d.id)).toList());
   }
 
+  /// Aluno posta uma dica na turma.
   Future<void> adicionarDica(String turmaId, DicaAluno dica, String nomeBaseDisciplina) async {
     final data = dica.toMap();
     data['nomeBaseDisciplina'] = nomeBaseDisciplina;
@@ -320,7 +354,7 @@ class ServicoFirestore {
   // 5. GESTÃO, CSV E ESCRITA
   // ===========================================================================
 
-  // SUGESTÕES
+  /// Envia feedback ou sugestão para o app.
   Future<void> enviarSugestao(String texto, String autorId) async {
     await _db.collection('sugestoes').add({
       'texto': texto,
@@ -329,7 +363,9 @@ class ServicoFirestore {
     });
   }
 
-  // HISTÓRICO DE CHAMADAS
+  // --- HISTÓRICO DE CHAMADAS ---
+  
+  /// Retorna a lista de dias em que houve aula registrada.
   Stream<List<String>> getDatasChamadas(String turmaId) {
     return _db
         .collection('turmas')
@@ -339,11 +375,13 @@ class ServicoFirestore {
         .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
   }
 
+  /// Retorna os detalhes de uma chamada específica (quem estava presente).
   Future<Map<String, dynamic>> getDadosChamada(String turmaId, String dataId) async {
     final doc = await _db.collection('turmas').doc(turmaId).collection('aulas').doc(dataId).get();
     return doc.data() ?? {};
   }
 
+  /// Corrige uma chamada passada (Histórico).
   Future<void> atualizarChamadaHistorico(String turmaId, String dataId, List<String> presentesInicio, List<String> presentesFim) async {
     await _db.collection('turmas').doc(turmaId).collection('aulas').doc(dataId).update({
       'presentes_inicio': presentesInicio,
@@ -351,40 +389,48 @@ class ServicoFirestore {
     });
   }
 
-  // GERAÇÃO DE PLANILHA (CSV) - TURMA
+  /// GERAÇÃO DE PLANILHA (CSV) - TURMA
+  /// Formato Matriz: Linhas = Alunos, Colunas = Dias.
+  /// Valor: P (Presente) ou F (Falta).
   Future<String> gerarPlanilhaTurma(String turmaId) async {
     // 1. Pega alunos inscritos
     final alunosDoc = await _db.collection('turmas').doc(turmaId).get();
     final List<String> alunoUids = List<String>.from(alunosDoc.data()!['alunosInscritos'] ?? []);
     
+    // Mapeia UID -> Nome
     Map<String, String> nomesAlunos = {};
     for (var uid in alunoUids) {
       final u = await getUsuario(uid);
       nomesAlunos[uid] = u?.alunoInfo?.nomeCompleto ?? 'Desconhecido';
     }
 
-    // 2. Pega os dias de aula
+    // 2. Pega os dias de aula (coleção 'aulas')
     final aulasSnapshot = await _db.collection('turmas').doc(turmaId).collection('aulas').orderBy('data').get();
     
-    // Cabeçalho CSV
-    String csv = "\uFEFFNome do Aluno"; // \uFEFF é o BOM para Excel reconhecer UTF-8
+    // Cabeçalho CSV (com BOM para UTF-8 no Excel)
+    String csv = "\uFEFFNome do Aluno"; 
     List<String> datas = [];
+    
     for (var doc in aulasSnapshot.docs) {
        DateTime dataAula = (doc.data()['data'] as Timestamp).toDate();
        String dataFormatada = DateFormat('dd/MM').format(dataAula);
-       datas.add(doc.id); // ID é a data
-       csv += ";$dataFormatada"; // Ponto e vírgula é melhor para Excel no Brasil
+       datas.add(doc.id); // ID do documento é a data yyyy-MM-dd
+       csv += ";$dataFormatada"; // Ponto e vírgula para separador
     }
     csv += "\n";
 
-    // Linhas (Alunos)
+    // Linhas (Uma por aluno)
     for (var uid in alunoUids) {
       csv += "${nomesAlunos[uid]}";
       for (var data in datas) {
         final aulaDoc = aulasSnapshot.docs.firstWhere((d) => d.id == data);
         final dadosAula = aulaDoc.data();
-        final presentes = List<String>.from(dadosAula['presentes_inicio'] ?? []) + List<String>.from(dadosAula['presentes_fim'] ?? []);
         
+        // Junta presença de início e fim
+        final presentes = List<String>.from(dadosAula['presentes_inicio'] ?? []) + 
+                          List<String>.from(dadosAula['presentes_fim'] ?? []);
+        
+        // Se o aluno estiver na lista, marca P
         csv += presentes.contains(uid) ? ";P" : ";F";
       }
       csv += "\n";
@@ -392,13 +438,16 @@ class ServicoFirestore {
     return csv;
   }
 
-  // --- ATIVIDADES DO CA ---
+  // --- EVENTOS DO C.A. ---
+  
+  /// Lista as atividades (palestras) de um evento.
   Stream<List<AtividadeEvento>> getAtividadesEvento(String eventoId) {
     return _db.collection('eventos').doc(eventoId).collection('atividades')
       .orderBy('dataHora').snapshots()
       .map((s) => s.docs.map((d) => AtividadeEvento.fromMap(d.data(), d.id)).toList());
   }
 
+  /// Cria uma nova atividade dentro do evento.
   Future<void> criarAtividadeEvento(String eventoId, String nome, DateTime data, String local) async {
     await _db.collection('eventos').doc(eventoId).collection('atividades').add({
       'nome': nome,
@@ -408,13 +457,15 @@ class ServicoFirestore {
     });
   }
 
+  /// Registra quem participou da atividade (check-in).
   Future<void> registrarPresencaAtividade(String eventoId, String atividadeId, List<String> uids) async {
     await _db.collection('eventos').doc(eventoId).collection('atividades').doc(atividadeId).update({
       'presentes': FieldValue.arrayUnion(uids),
     });
   }
 
-  // GERAÇÃO DE PLANILHA (CSV) - EVENTO CA
+  /// GERAÇÃO DE PLANILHA (CSV) - EVENTO CA
+  /// Formato Lista: Atividade | Participante | RA
   Future<String> gerarPlanilhaEvento(String eventoId) async {
     final atividades = await _db.collection('eventos').doc(eventoId).collection('atividades').get();
     
@@ -432,7 +483,7 @@ class ServicoFirestore {
     return csv;
   }
 
-  // --- MÉTODOS DE ESCRITA GERAIS ---
+  // --- MÉTODOS GERAIS ---
 
   Future<void> atualizarSolicitacao(String solicitacaoId, StatusSolicitacao novoStatus, String resposta) async {
     await _db.collection('solicitacoes').doc(solicitacaoId).update({
@@ -441,6 +492,7 @@ class ServicoFirestore {
     });
   }
 
+  // Gera código aleatório para turma (ex: A1B2C3)
   String _gerarCodigoAleatorio({int length = 6}) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     Random rnd = Random();
@@ -448,9 +500,12 @@ class ServicoFirestore {
         length, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
   }
   
+  /// Cria uma nova turma e gera o código de convite.
   Future<String> criarTurma(TurmaProfessor turma) async {
     String codigo = '';
     bool codigoUnico = false;
+    
+    // Garante que o código seja único no banco
     while (!codigoUnico) {
       codigo = _gerarCodigoAleatorio();
       final snapshot = await _db.collection('turmas').where('turmaCode', isEqualTo: codigo).limit(1).get();
@@ -461,7 +516,7 @@ class ServicoFirestore {
     
     final dadosTurma = turma.toMap();
     dadosTurma['turmaCode'] = codigo;
-    dadosTurma['linkConvite'] = "academicconnect://entrar/$codigo";
+    dadosTurma['linkConvite'] = "academicconnect://entrar/$codigo"; // Link profundo
 
     final docRef = await _db.collection('turmas').add(dadosTurma);
     await docRef.update({'id': docRef.id}); 
@@ -484,6 +539,7 @@ class ServicoFirestore {
     });
   }
 
+  /// Inscreve o aluno na turma usando o código.
   Future<void> entrarNaTurma(String turmaCode, String alunoUid) async {
     final query = await _db
         .collection('turmas')
@@ -519,6 +575,7 @@ class ServicoFirestore {
     await _db.collection('solicitacoes').add(solicitacao.toMap());
   }
 
+  /// Salva a lista de presença (NFC ou Manual) no histórico.
   Future<void> salvarPresenca(
       String turmaId, String tipoChamada, List<String> presentesUids, DateTime dataChamada) async {
     
@@ -529,14 +586,14 @@ class ServicoFirestore {
         .collection('aulas') 
         .doc(dataString);
 
-    final String campo = 'presentes_$tipoChamada';
+    final String campo = 'presentes_$tipoChamada'; // presentes_inicio ou presentes_fim
 
     await docRef.set(
       {
         'data': Timestamp.fromDate(dataChamada),
         campo: presentesUids,
       },
-      SetOptions(merge: true), 
+      SetOptions(merge: true), // Não apaga os dados da outra chamada se já existir
     );
   }
   
@@ -548,6 +605,7 @@ class ServicoFirestore {
     });
   }
 
+  /// Salva as notas de toda a turma.
   Future<void> salvarNotas(
       String turmaId, String avaliacaoNome, Map<String, double?> notas) async {
     final turmaDoc = await _db.collection('turmas').doc(turmaId).get();
@@ -560,6 +618,7 @@ class ServicoFirestore {
       final alunoId = entry.key;
       final nota = entry.value;
       
+      // Verifica se já existe nota para este aluno nesta avaliação
       final query = await _db
           .collection('notas')
           .where('alunoId', isEqualTo: alunoId)
@@ -569,9 +628,11 @@ class ServicoFirestore {
           .get();
 
       if (query.docs.isNotEmpty) {
+        // Atualiza
         final docRef = query.docs.first.reference;
         batch.update(docRef, {'nota': nota, 'dataLancamento': Timestamp.now()});
       } else {
+        // Cria nova
         final docRef = _db.collection('notas').doc(); 
         batch.set(docRef, {
           'alunoId': alunoId,
@@ -622,11 +683,13 @@ class ServicoFirestore {
 // 6. PROVEDORES (Riverpod)
 // ===========================================================================
 
+/// Instância global do serviço de Firestore.
 final servicoFirestoreProvider = Provider<ServicoFirestore>((ref) {
   return ServicoFirestore();
 });
 
-// Hub
+// --- Streams para atualizar a UI automaticamente ---
+
 final streamMensagensProvider =
     StreamProvider.family<List<MensagemChat>, String>((ref, turmaId) {
   return ref.watch(servicoFirestoreProvider).getStreamMensagens(turmaId);

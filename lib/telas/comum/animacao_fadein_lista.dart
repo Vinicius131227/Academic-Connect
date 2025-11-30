@@ -1,44 +1,96 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; 
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-/// Um widget que aplica um efeito de fade-in e slide-up escalonado
-/// para cada item em uma lista de [children].
-class FadeInListAnimation extends StatefulWidget {
-  final List<Widget> children;
-  const FadeInListAnimation({super.key, required this.children});
-
-  @override
-  State<FadeInListAnimation> createState() => _FadeInListAnimationState();
+/// Caso de uso para o Widgetbook: Lista animada.
+@UseCase(
+  name: 'Lista FadeIn',
+  type: FadeInListAnimation,
+)
+Widget buildFadeInList(BuildContext context) {
+  return Scaffold(
+    body: FadeInListAnimation(
+      children: List.generate(5, (index) => Card(
+        child: ListTile(title: Text("Item $index")),
+      )),
+    ),
+  );
 }
 
-class _FadeInListAnimationState extends State<FadeInListAnimation> with SingleTickerProviderStateMixin {
+/// Widget que anima uma lista de filhos com efeito de Fade In e Slide Up.
+///
+/// Útil para tornar a entrada em telas de dashboard mais suave.
+class FadeInListAnimation extends StatelessWidget {
+  /// Lista de widgets a serem animados.
+  final List<Widget> children;
+  
+  /// Duração da animação (Padrão: 375ms).
+  final Duration duration;
+
+  const FadeInListAnimation({
+    super.key, 
+    required this.children,
+    this.duration = const Duration(milliseconds: 500), // Um pouco mais lento para suavidade
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Usando AnimationLimiter e Configuration do pacote flutter_staggered_animations
+    // Se não tiver o pacote, pode substituir por um ListView simples, mas aqui implementamos
+    // uma lógica manual simples de Staggered para não quebrar se faltar o pacote.
+    
+    return ListView.builder(
+      physics: const BouncingScrollPhysics(),
+      shrinkWrap: true, // Permite usar dentro de outros Scrollers se necessário
+      itemCount: children.length,
+      itemBuilder: (BuildContext context, int index) {
+        return _AnimatedItem(
+          index: index,
+          duration: duration,
+          child: children[index],
+        );
+      },
+    );
+  }
+}
+
+/// Item individual animado internamente.
+class _AnimatedItem extends StatefulWidget {
+  final int index;
+  final Duration duration;
+  final Widget child;
+
+  const _AnimatedItem({
+    required this.index,
+    required this.duration,
+    required this.child,
+  });
+
+  @override
+  State<_AnimatedItem> createState() => _AnimatedItemState();
+}
+
+class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late List<Animation<double>> _animations;
+  late Animation<double> _opacity;
+  late Animation<Offset> _translate;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      // A duração total é baseada no número de itens
-      duration: Duration(milliseconds: 300 + (widget.children.length * 80)),
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    
+    _opacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    
+    _translate = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
-    // Cria uma animação para cada item
-    _animations = widget.children.map((_) {
-      final index = widget.children.indexOf(_);
-      // Calcula o início e fim do delay para cada item
-      final startTime = (index * 80) / _controller.duration!.inMilliseconds;
-      final endTime = (startTime + (400 / _controller.duration!.inMilliseconds)).clamp(0.0, 1.0);
-
-      return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: Interval(startTime, endTime, curve: Curves.easeOut),
-        ),
-      );
-    }).toList();
-
-    _controller.forward();
+    // Adiciona um delay baseado no índice para criar o efeito "cascata"
+    Future.delayed(Duration(milliseconds: widget.index * 100), () {
+      if (mounted) _controller.forward();
+    });
   }
 
   @override
@@ -49,25 +101,11 @@ class _FadeInListAnimationState extends State<FadeInListAnimation> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(widget.children.length, (index) {
-          return AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Opacity(
-                opacity: _animations[index].value, // Aplica o fade
-                child: Transform.translate(
-                  offset: Offset(0, (1.0 - _animations[index].value) * 15), // Aplica o slide
-                  child: child,
-                ),
-              );
-            },
-            child: widget.children[index],
-          );
-        }),
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _translate,
+        child: widget.child,
       ),
     );
   }

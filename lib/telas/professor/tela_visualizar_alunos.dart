@@ -1,76 +1,100 @@
 // lib/telas/professor/tela_visualizar_alunos.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+
+// Importações internas
 import '../../models/turma_professor.dart';
 import '../../models/aluno_chamada.dart';
 import '../../services/servico_firestore.dart';
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
 import '../comum/widget_carregamento.dart';
 
-class TelaVisualizarAlunos extends ConsumerStatefulWidget {
+/// Caso de uso para o Widgetbook.
+/// Simula a tela de visualização de alunos de uma turma.
+@UseCase(
+  name: 'Visualizar Alunos',
+  type: TelaVisualizarAlunos,
+)
+Widget buildTelaVisualizarAlunos(BuildContext context) {
+  return ProviderScope(
+    child: TelaVisualizarAlunos(
+      turma: TurmaProfessor(
+        id: 'mock_id',
+        nome: 'Física 1',
+        horario: 'Seg 08:00',
+        local: 'Sala 10',
+        professorId: 'prof_id',
+        turmaCode: 'A1B2C3',
+        creditos: 4,
+        alunosInscritos: [],
+      ),
+    ),
+  );
+}
+
+/// Provedor que busca a lista de alunos de uma turma específica.
+final alunosTurmaProvider = FutureProvider.family<List<AlunoChamada>, String>((ref, turmaId) async {
+  return ref.read(servicoFirestoreProvider).getAlunosDaTurma(turmaId);
+});
+
+/// Tela que exibe a lista de alunos inscritos na disciplina.
+/// Permite ao professor ter uma visão geral da classe.
+class TelaVisualizarAlunos extends ConsumerWidget {
   final TurmaProfessor turma;
+  
   const TelaVisualizarAlunos({super.key, required this.turma});
 
   @override
-  ConsumerState<TelaVisualizarAlunos> createState() => _TelaVisualizarAlunosState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context)!;
+    
+    // Busca os dados
+    final asyncAlunos = ref.watch(alunosTurmaProvider(turma.id));
+    
+    // Tema
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
-class _TelaVisualizarAlunosState extends ConsumerState<TelaVisualizarAlunos> {
-  Future<List<AlunoChamada>>? _futureAlunos;
-
-  @override
-  void initState() {
-    super.initState();
-    _carregarAlunos();
-  }
-
-  void _carregarAlunos() {
-    setState(() {
-      _futureAlunos = ref.read(servicoFirestoreProvider).getAlunosDaTurma(widget.turma.id);
-    });
-  }
-
-  void _removerAluno(String alunoId, String nome) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Remover Aluno"),
-        content: Text("Tem certeza que deseja remover $nome desta turma?"),
-        actions: [
-          TextButton(child: const Text("Cancelar"), onPressed: () => Navigator.pop(ctx)),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Remover"),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(servicoFirestoreProvider).removerAlunoDaTurma(widget.turma.id, alunoId);
-              _carregarAlunos(); // Recarrega a lista
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Aluno removido.")));
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Alunos Inscritos")),
-      body: FutureBuilder<List<AlunoChamada>>(
-        future: _futureAlunos,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const WidgetCarregamento(texto: "Buscando alunos...");
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text("Erro: ${snapshot.error}"));
-          }
-          final alunos = snapshot.data ?? [];
-          
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          t.t('prof_ver_alunos'), // "Ver Alunos"
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: textColor),
+      ),
+      body: asyncAlunos.when(
+        loading: () => const WidgetCarregamento(texto: "Carregando lista..."),
+        error: (e, s) => Center(child: Text("${t.t('erro_generico')}: $e")),
+        data: (alunos) {
           if (alunos.isEmpty) {
-            return const Center(child: Text("Nenhum aluno inscrito nesta turma."));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 64, color: Colors.grey.withOpacity(0.5)),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Nenhum aluno inscrito nesta turma.", // Fallback se não houver tradução específica
+                    style: TextStyle(color: textColor?.withOpacity(0.6)),
+                  ),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    "${t.t('criar_turma_codigo_desc')} ${turma.turmaCode}",
+                    style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            );
           }
 
           return ListView.builder(
@@ -79,14 +103,20 @@ class _TelaVisualizarAlunosState extends ConsumerState<TelaVisualizarAlunos> {
             itemBuilder: (context, index) {
               final aluno = alunos[index];
               return Card(
+                color: cardColor,
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: ListTile(
-                  leading: CircleAvatar(child: Text(aluno.nome[0])),
-                  title: Text(aluno.nome),
-                  subtitle: Text("RA: ${aluno.ra}"),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.person_remove, color: Colors.red),
-                    onPressed: () => _removerAluno(aluno.id, aluno.nome),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryPurple.withOpacity(0.1),
+                    child: Text(
+                      aluno.nome.isNotEmpty ? aluno.nome[0].toUpperCase() : '?',
+                      style: const TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
+                    ),
                   ),
+                  title: Text(aluno.nome, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                  subtitle: Text("${t.t('cadastro_ra_label')}: ${aluno.ra}", style: TextStyle(color: textColor?.withOpacity(0.7))),
                 ),
               );
             },

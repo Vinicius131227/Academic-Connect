@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../models/evento_ca.dart';
-import '../../providers/provedor_ca.dart';
-import '../../l10n/app_localizations.dart'; // Importa i18n
+import '../../models/participante_evento.dart';
+import '../../models/atividade_evento.dart';
+import '../../services/servico_firestore.dart';
+import '../../themes/app_theme.dart';
+import '../comum/widget_carregamento.dart';
+import '../../l10n/app_localizations.dart';
+
+// Provider temporário para gerenciar o estado local da tela (NFC e Lista)
+// Em um app maior, isso ficaria em um arquivo separado.
+final atividadeSelecionadaProvider = StateProvider.autoDispose<AtividadeEvento?>((ref) => null);
 
 class TelaPresencaEvento extends ConsumerStatefulWidget {
   final EventoCA evento;
@@ -13,268 +23,213 @@ class TelaPresencaEvento extends ConsumerStatefulWidget {
 }
 
 class _TelaPresencaEventoState extends ConsumerState<TelaPresencaEvento> {
-  // --- NOVO: Estado de carregamento para o botão Salvar ---
-  bool _isLoading = false;
-  
+  List<AtividadeEvento> _atividades = [];
+  List<ParticipanteEvento> _participantesVisuais = [];
+  bool _isLoading = true;
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
-    // Limpa qualquer estado de uma chamada anterior ao abrir a tela
-    Future.microtask(() => ref.read(provedorPresencaEventoNFC.notifier).reset());
+    _carregarDados();
   }
 
-  @override
-  void dispose() {
-    // Pausa a leitura ao sair da tela
-    Future.microtask(() => ref.read(provedorPresencaEventoNFC.notifier).pausarLeitura());
-    super.dispose();
+  // Carrega as atividades (palestras) do evento
+  Future<void> _carregarDados() async {
+    final servico = ref.read(servicoFirestoreProvider);
+    
+    // Stream de atividades
+    final stream = servico.getAtividadesEvento(widget.evento.id);
+    stream.listen((atividades) {
+      if (mounted) {
+        setState(() {
+          _atividades = atividades;
+          // Seleciona a primeira por padrão se nada estiver selecionado
+          if (_atividades.isNotEmpty && ref.read(atividadeSelecionadaProvider) == null) {
+            ref.read(atividadeSelecionadaProvider.notifier).state = _atividades.first;
+            _carregarParticipantes(_atividades.first);
+          } else if (_atividades.isEmpty) {
+            _isLoading = false;
+          }
+        });
+      }
+    });
   }
 
-  // --- NOVO MÉTODO: Salvar Presença ---
-  Future<void> _onSalvar(BuildContext context) async {
-    final t = AppLocalizations.of(context)!;
-    final notifier = ref.read(provedorPresencaEventoNFC.notifier);
-
+  // Carrega a lista de alunos para mostrar na tela
+  Future<void> _carregarParticipantes(AtividadeEvento atividade) async {
     setState(() => _isLoading = true);
+    final servico = ref.read(servicoFirestoreProvider);
+    
+    List<ParticipanteEvento> listaVisual = [];
+
+    // Se não tiver ninguém inscrito no evento pai, a lista é vazia
+    if (widget.evento.participantesInscritos.isEmpty) {
+       setState(() {
+         _participantesVisuais = [];
+         _isLoading = false;
+       });
+       return;
+    }
+
+    // Busca os dados de cada participante inscrito
+    for (String uid in widget.evento.participantesInscritos) {
+      final user = await servico.getUsuario(uid);
+      if (user != null && user.alunoInfo != null) {
+        listaVisual.add(ParticipanteEvento(
+          id: uid,
+          nome: user.alunoInfo!.nomeCompleto,
+          ra: user.alunoInfo!.ra,
+          // Marca como presente se o ID já estiver na lista da atividade
+          isPresente: atividade.presentes.contains(uid),
+        ));
+      }
+    }
+
+    setState(() {
+      _participantesVisuais = listaVisual;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _salvarPresenca() async {
+    final atividade = ref.read(atividadeSelecionadaProvider);
+    if (atividade == null) return;
+
+    setState(() => _isSaving = true);
+    
+    // Filtra UIDs marcados
+    final presentesUids = _participantesVisuais
+        .where((p) => p.isPresente)
+        .map((p) => p.id)
+        .toList();
 
     try {
-      // Chama o notificador para salvar no Firebase
-      await notifier.salvarChamadaEvento(widget.evento.id);
+      await ref.read(servicoFirestoreProvider).registrarPresencaAtividade(
+        widget.evento.id, 
+        atividade.id, 
+        presentesUids
+      );
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.t('ca_presenca_salva_sucesso') ?? 'Presença salva com sucesso!'), backgroundColor: Colors.green), // TODO: Adicionar tradução
+          const SnackBar(content: Text("Lista salva com sucesso!"), backgroundColor: Colors.green)
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red)
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
-  // --- FIM NOVO MÉTODO ---
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!; // Pega o tradutor
-    // USA O PROVEDOR DO C.A.
-    final estadoNFC = ref.watch(provedorPresencaEventoNFC); 
-    final notifierNFC = ref.read(provedorPresencaEventoNFC.notifier);
-    final bool lendo = estadoNFC.status == StatusNFC.lendo;
+    final t = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final atividadeSelecionada = ref.watch(atividadeSelecionadaProvider);
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(t.t('ca_presenca_titulo') ?? 'Registrar Presença'), // TODO: Adicionar tradução
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(30.0),
-          child: Container(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            alignment: Alignment.center,
-            child: Text(
-              widget.evento.nome, // Mostra o nome do Evento
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          ),
+        title: Text(
+          widget.evento.nome, 
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
         ),
+        iconTheme: IconThemeData(color: textColor),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _buildCardLeitura(context, t, lendo, estadoNFC.status, estadoNFC.erro, notifierNFC, widget.evento.id),
-                const SizedBox(height: 16),
-                _buildCardPresentes(context, t, estadoNFC),
-                const SizedBox(height: 16),
-                _buildCardRegistrados(context, t, estadoNFC),
-              ],
-            ),
-          ),
-          _buildFeedbackPopup(
-            context,
-            sucessoMsg: estadoNFC.ultimoAluno,
-            erroMsg: estadoNFC.ultimoErroScan,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // (Todos os widgets auxiliares abaixo são idênticos aos da tela do professor)
-  Widget _buildCardLeitura(BuildContext context, AppLocalizations t, bool lendo, StatusNFC status, String? erro, NotificadorPresencaEventoNFC notifier, String eventoId) {
-    IconData icone = Icons.nfc;
-    Color corIcone = Colors.grey;
-    String titulo = t.t('prof_presenca_nfc_pausada_titulo') ?? 'Leitura NFC Pausada'; 
-    String subtitulo = t.t('prof_presenca_nfc_pausada_desc') ?? 'Clique em "Iniciar Leitura" para começar'; 
-    
-    if (lendo) {
-      icone = Icons.nfc; corIcone = Colors.green;
-      titulo = t.t('ca_presenca_nfc_lendo_titulo') ?? 'Aguardando cartão...'; // TODO: Adicionar tradução
-      subtitulo = t.t('ca_presenca_nfc_lendo_desc') ?? 'Os participantes devem aproximar seus cartões'; // TODO: Adicionar tradução
-    } else if (status == StatusNFC.indisponivel) {
-      icone = Icons.nfc_outlined; corIcone = Colors.red;
-      titulo = t.t('prof_presenca_nfc_indisponivel_titulo') ?? 'NFC Indisponível';
-      subtitulo = erro ?? t.t('prof_presenca_nfc_indisponivel_desc') ?? 'Este dispositivo não suporta NFC.';
-    } else if (status == StatusNFC.erro) {
-      icone = Icons.error_outline; corIcone = Colors.red;
-      titulo = t.t('prof_presenca_nfc_erro_titulo') ?? 'Erro na Leitura';
-      subtitulo = erro ?? t.t('prof_presenca_nfc_erro_desc') ?? 'Ocorreu um erro. Tente novamente.';
-    }
-    
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            Icon(icone, size: 80, color: corIcone),
-            const SizedBox(height: 16),
-            Text(titulo, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(subtitulo, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: (status == StatusNFC.erro || status == StatusNFC.indisponivel) ? Colors.red : null), textAlign: TextAlign.center),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: Icon(lendo ? Icons.pause : Icons.play_arrow),
-              label: Text(lendo ? (t.t('prof_presenca_nfc_pausar') ?? 'Pausar Leitura') : (t.t('prof_presenca_nfc_iniciar') ?? 'Iniciar Leitura')),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: lendo ? Colors.grey : Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              ),
-              onPressed: (status == StatusNFC.indisponivel || _isLoading) ? null : () {
-                lendo ? notifier.pausarLeitura() : notifier.iniciarLeitura(eventoId);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCardPresentes(BuildContext context, AppLocalizations t, EstadoPresencaNFC estado) {
-    return Card(
-      color: Colors.green[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
+          // --- SELETOR DE ATIVIDADE ---
+          if (_atividades.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: isDark ? Colors.black12 : Colors.grey[100],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.group, color: Colors.green[800]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${t.t('prof_presenca_presentes') ?? 'Presentes'}: ${estado.presentes.length}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.green[800],
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Text("Selecione a Atividade:", style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<AtividadeEvento>(
+                    value: atividadeSelecionada,
+                    dropdownColor: cardColor,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: cardColor,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
+                    items: _atividades.map((atv) => DropdownMenuItem(
+                      value: atv,
+                      child: Text(atv.nome, style: TextStyle(color: textColor)),
+                    )).toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                         ref.read(atividadeSelecionadaProvider.notifier).state = v;
+                         _carregarParticipantes(v);
+                      }
+                    },
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8), 
-            if (estado.presentes.isNotEmpty)
-              ElevatedButton(
-                onPressed: _isLoading ? null : () => _onSalvar(context),
-                child: _isLoading 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(t.t('prof_presenca_nfc_finalizar') ?? 'Finalizar e Salvar'), // TODO: Adicionar tradução
-              ),
-          ],
-        ),
-      ),
-    );
-  }
+            )
+          else if (!_isLoading)
+             Padding(
+               padding: const EdgeInsets.all(32.0),
+               child: Center(child: Text("Nenhuma atividade cadastrada neste evento.", style: TextStyle(color: textColor))),
+             ),
 
-  Widget _buildCardRegistrados(BuildContext context, AppLocalizations t, EstadoPresencaNFC estado) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              t.t('ca_presenca_registrados') ?? 'Participantes Registrados', // TODO: Adicionar tradução
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const Divider(height: 24),
-            if (estado.presentes.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(t.t('ca_presenca_vazio') ?? 'Nenhum participante registrado ainda'), // TODO: Adicionar tradução
-                ),
-              )
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: estado.presentes.length,
-                itemBuilder: (context, index) {
-                  final aluno = estado.presentes.reversed.toList()[index];
-                  return ListTile(
-                    leading: const Icon(Icons.check_circle, color: Colors.green),
-                    title: Text(aluno.nome),
-                    subtitle: Text(t.t('prof_presenca_nfc_presente') ?? 'Presente'),
-                    trailing: Text(aluno.hora),
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildFeedbackPopup(BuildContext context, {String? sucessoMsg, String? erroMsg}) {
-    bool mostrarSucesso = sucessoMsg != null;
-    bool mostrarErro = erroMsg != null;
-    bool mostrar = mostrarSucesso || mostrarErro;
-    
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      top: mostrar ? 0 : -100,
-      left: 0,
-      right: 0,
-      child: Material(
-        elevation: 4.0,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          color: mostrarSucesso ? Colors.green : Colors.red,
-          child: SafeArea(
-            bottom: false,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(mostrarSucesso ? Icons.check_circle : Icons.error, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    sucessoMsg ?? erroMsg ?? '',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+          // --- LISTA DE ALUNOS ---
+          Expanded(
+            child: _isLoading 
+              ? const WidgetCarregamento(texto: "Carregando lista...")
+              : _participantesVisuais.isEmpty
+                  ? Center(child: Text("Nenhum inscrito no evento.", style: TextStyle(color: textColor)))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _participantesVisuais.length,
+                      itemBuilder: (context, index) {
+                        final p = _participantesVisuais[index];
+                        return Card(
+                          color: cardColor,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: CheckboxListTile(
+                            activeColor: AppColors.primaryPurple,
+                            title: Text(p.nome, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+                            subtitle: Text("RA: ${p.ra}", style: TextStyle(color: textColor?.withOpacity(0.7))),
+                            value: p.isPresente,
+                            onChanged: (val) {
+                              setState(() {
+                                p.isPresente = val ?? false;
+                              });
+                            },
+                          ),
+                        );
+                      },
+                    ),
           ),
-        ),
+        ],
       ),
+      
+      // Botão Flutuante Salvar
+      floatingActionButton: _atividades.isNotEmpty ? FloatingActionButton.extended(
+        onPressed: _isSaving ? null : _salvarPresenca,
+        backgroundColor: AppColors.primaryPurple,
+        icon: _isSaving 
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+            : const Icon(Icons.save, color: Colors.white),
+        label: Text(_isSaving ? "Salvando..." : "Salvar Presença", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ) : null,
     );
   }
 }

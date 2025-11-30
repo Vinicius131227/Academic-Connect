@@ -4,9 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class DicaAluno {
   final String id;
   final String texto;
-  final String alunoId; 
+  final String alunoId;
   final DateTime dataPostagem;
   final int upvotes;
+  final String? nomeBaseDisciplina; // Para busca global
 
   DicaAluno({
     required this.id,
@@ -14,17 +15,8 @@ class DicaAluno {
     required this.alunoId,
     required this.dataPostagem,
     this.upvotes = 0,
+    this.nomeBaseDisciplina,
   });
-
-  factory DicaAluno.fromMap(Map<String, dynamic> data, String documentId) {
-    return DicaAluno(
-      id: documentId,
-      texto: data['texto'] ?? '',
-      alunoId: data['alunoId'] ?? '',
-      dataPostagem: (data['dataPostagem'] as Timestamp).toDate(),
-      upvotes: data['upvotes'] ?? 0,
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -32,6 +24,18 @@ class DicaAluno {
       'alunoId': alunoId,
       'dataPostagem': Timestamp.fromDate(dataPostagem),
       'upvotes': upvotes,
+      'nomeBaseDisciplina': nomeBaseDisciplina,
     };
+  }
+
+  factory DicaAluno.fromMap(Map<String, dynamic> map, String id) {
+    return DicaAluno(
+      id: id,
+      texto: map['texto'] ?? '',
+      alunoId: map['alunoId'] ?? '',
+      dataPostagem: (map['dataPostagem'] as Timestamp).toDate(),
+      upvotes: map['upvotes'] ?? 0,
+      nomeBaseDisciplina: map['nomeBaseDisciplina'],
+    );
   }
 }

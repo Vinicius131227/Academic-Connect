@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
-import '../../providers/provedor_ca.dart'; // Para as funções específicas do CA (se houver)
-import '../../providers/provedores_app.dart'; // Para o stream de eventos
+import '../../providers/provedor_ca.dart'; // Caso tenha lógica específica do CA
+import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
@@ -29,11 +29,10 @@ class AbaInicioCA extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Cores dinâmicas
     final Color textColor = isDark ? Colors.white : Colors.black87;
     final Color subTextColor = isDark ? Colors.white70 : Colors.black54;
     final Color cardBgColor = isDark ? AppColors.surfaceDark : Colors.white;
-    final Color borderColor = isDark ? Colors.white10 : Colors.black12;
+    final Color borderColor = isDark ? Colors.transparent : Colors.black12;
 
     final widgets = [
       // 1. CABEÇALHO
@@ -47,7 +46,7 @@ class AbaInicioCA extends ConsumerWidget {
                 children: [
                   const Text("📢 ", style: TextStyle(fontSize: 24)),
                   Text(
-                    "Olá, $nomeCA",
+                    "${t.t('inicio_ola')}, $nomeCA",
                     style: GoogleFonts.poppins(
                       fontSize: 24, 
                       fontWeight: FontWeight.bold, 
@@ -58,7 +57,7 @@ class AbaInicioCA extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                "Gerencie os eventos do campus.",
+                t.t('ca_inicio_resumo'),
                 style: GoogleFonts.poppins(fontSize: 14, color: subTextColor),
               ),
             ],
@@ -67,7 +66,8 @@ class AbaInicioCA extends ConsumerWidget {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: cardBgColor, 
-              shape: BoxShape.circle
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor)
             ),
             child: Icon(Icons.campaign, color: textColor),
           ),
@@ -76,7 +76,7 @@ class AbaInicioCA extends ConsumerWidget {
 
       const SizedBox(height: 24),
 
-      // 2. CARD DE STATUS (Laranja/Roxo - Destaque)
+      // 2. CARD DE STATUS (Laranja Vibrante)
       asyncEventos.when(
         data: (eventos) {
           final totalInscritos = eventos.fold(0, (sum, e) => sum + e.totalParticipantes);
@@ -85,7 +85,7 @@ class AbaInicioCA extends ConsumerWidget {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF8A65), Color(0xFFFF7043)], // Laranja Vibrante
+                colors: [Color(0xFFFF8A65), Color(0xFFFF7043)], 
                 begin: Alignment.topLeft, 
                 end: Alignment.bottomRight
               ),
@@ -104,13 +104,13 @@ class AbaInicioCA extends ConsumerWidget {
                 _buildStatusItem(
                   icon: Icons.event_available, 
                   value: eventos.length.toString(), 
-                  label: "Eventos Ativos"
+                  label: t.t('ca_eventos_ativos')
                 ),
                 Container(width: 1, height: 40, color: Colors.white30),
                 _buildStatusItem(
                   icon: Icons.groups, 
                   value: totalInscritos.toString(), 
-                  label: "Participantes"
+                  label: t.t('ca_participantes')
                 ),
               ],
             ),
@@ -122,9 +122,9 @@ class AbaInicioCA extends ConsumerWidget {
 
       const SizedBox(height: 32),
 
-      // 3. AÇÕES RÁPIDAS (Grid de Botões)
+      // 3. AÇÕES RÁPIDAS
       Text(
-        "Gestão de Eventos", 
+        t.t('ca_subtitulo'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
       ),
       const SizedBox(height: 16),
@@ -135,7 +135,7 @@ class AbaInicioCA extends ConsumerWidget {
             child: _buildCategoryItem(
               context,
               icon: Icons.add_box_outlined,
-              label: "Criar Evento",
+              label: t.t('ca_criar_evento'),
               color: const Color(0xFFE3F2FD), // Azul claro
               iconColor: Colors.blue,
               textColor: subTextColor,
@@ -147,19 +147,16 @@ class AbaInicioCA extends ConsumerWidget {
             child: _buildCategoryItem(
               context,
               icon: Icons.qr_code_scanner,
-              label: "Ler Presença",
+              label: t.t('ca_ler_presenca'),
               color: const Color(0xFFE8F5E9), // Verde claro
               iconColor: Colors.green,
               textColor: subTextColor,
               onTap: () {
-                 // Pega o primeiro evento para demo ou abre lista de seleção
                  asyncEventos.whenData((eventos) {
                     if (eventos.isNotEmpty) {
-                       // Idealmente abriria um diálogo para escolher qual evento
-                       // Para o MVP, pegamos o primeiro ou o mais recente
                        Navigator.push(context, MaterialPageRoute(builder: (_) => TelaPresencaEvento(evento: eventos.first)));
                     } else {
-                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nenhum evento criado.")));
+                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.t('ca_sem_eventos'))));
                     }
                  });
               },
@@ -170,12 +167,12 @@ class AbaInicioCA extends ConsumerWidget {
             child: _buildCategoryItem(
               context,
               icon: Icons.email_outlined,
-              label: "Comunicado",
+              label: t.t('ca_comunicado'),
               color: const Color(0xFFFFF3E0), // Laranja claro
               iconColor: Colors.orange,
               textColor: subTextColor,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Envio de e-mail em massa (Simulado).")));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Demo")));
               },
             ),
           ),
@@ -184,9 +181,9 @@ class AbaInicioCA extends ConsumerWidget {
 
       const SizedBox(height: 32),
 
-      // 4. PRÓXIMOS EVENTOS (Lista)
+      // 4. PRÓXIMOS EVENTOS
       Text(
-        "Calendário de Eventos", 
+        t.t('ca_proximos_eventos'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
       ),
       const SizedBox(height: 16),
@@ -204,11 +201,10 @@ class AbaInicioCA extends ConsumerWidget {
                 border: Border.all(color: borderColor),
               ),
               child: Center(
-                child: Text("Nenhum evento agendado.", style: TextStyle(color: subTextColor))
+                child: Text(t.t('ca_sem_eventos'), style: TextStyle(color: subTextColor))
               ),
             );
           }
-          // Ordena por data
           eventos.sort((a, b) => a.data.compareTo(b.data));
           
           return Column(
@@ -325,7 +321,7 @@ class AbaInicioCA extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.location_on, size: 14, color: Colors.grey),
+                    const Icon(Icons.location_on, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(evento.local, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
                   ],
@@ -333,7 +329,6 @@ class AbaInicioCA extends ConsumerWidget {
               ],
             ),
           ),
-          // Ícone de seta ou menu
           const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
         ],
       ),

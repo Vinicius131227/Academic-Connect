@@ -5,7 +5,7 @@ class MensagemChat {
   final String id;
   final String texto;
   final String usuarioId;
-  final String usuarioNome; // Denormalizado para evitar buscas
+  final String usuarioNome;
   final DateTime dataHora;
 
   MensagemChat({
@@ -16,16 +16,6 @@ class MensagemChat {
     required this.dataHora,
   });
 
-  factory MensagemChat.fromMap(Map<String, dynamic> data, String documentId) {
-    return MensagemChat(
-      id: documentId,
-      texto: data['texto'] ?? '',
-      usuarioId: data['usuarioId'] ?? '',
-      usuarioNome: data['usuarioNome'] ?? '',
-      dataHora: (data['dataHora'] as Timestamp).toDate(),
-    );
-  }
-
   Map<String, dynamic> toMap() {
     return {
       'texto': texto,
@@ -33,5 +23,15 @@ class MensagemChat {
       'usuarioNome': usuarioNome,
       'dataHora': Timestamp.fromDate(dataHora),
     };
+  }
+
+  factory MensagemChat.fromMap(Map<String, dynamic> map, String id) {
+    return MensagemChat(
+      id: id,
+      texto: map['texto'] ?? '',
+      usuarioId: map['usuarioId'] ?? '',
+      usuarioNome: map['usuarioNome'] ?? 'Anônimo',
+      dataHora: (map['dataHora'] as Timestamp).toDate(),
+    );
   }
 }

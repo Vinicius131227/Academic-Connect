@@ -1,17 +1,38 @@
+// lib/telas/aluno/tela_notas_avaliacoes.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// --- IMPORTES ATUALIZADOS ---
+import 'package:intl/intl.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+
+// Importações internas
 import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../comum/widget_carregamento.dart';
-// --- FIM IMPORTES ATUALIZADOS ---
-import '../../models/disciplina_notas.dart';
+import '../../models/disciplina_notas.dart'; // Modelo correto
 import '../../models/prova_agendada.dart';
-import 'package:intl/intl.dart';
 import '../../providers/provedor_mapas.dart';
-import '../../l10n/app_localizations.dart';
+import '../../l10n/app_localizations.dart'; // Traduções
 
+/// Caso de uso para o Widgetbook.
+/// Simula a tela de notas com dados fictícios.
+@UseCase(
+  name: 'Notas e Avaliações',
+  type: TelaNotasAvaliacoes,
+)
+Widget buildTelaNotasAvaliacoes(BuildContext context) {
+  return const ProviderScope(
+    child: TelaNotasAvaliacoes(),
+  );
+}
+
+/// Tela que exibe o boletim do aluno e o calendário de provas.
+///
+/// Possui duas abas:
+/// 1. [Notas]: Lista expansível com detalhes de notas por matéria.
+/// 2. [Provas]: Lista cronológica de avaliações futuras.
 class TelaNotasAvaliacoes extends ConsumerWidget {
+  /// Se fornecido, a lista de notas já abre expandida nesta disciplina.
   final String? disciplinaInicial;
   
   const TelaNotasAvaliacoes({super.key, this.disciplinaInicial});
@@ -24,11 +45,11 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(t.t('notas_titulo')),
+          title: Text(t.t('notas_titulo')), // "Minhas Notas"
           bottom: TabBar(
             tabs: [
-              Tab(text: t.t('notas_tab_notas')),
-              Tab(text: t.t('notas_tab_provas')),
+              Tab(text: t.t('notas_tab_notas')), // "Notas por Disciplina"
+              Tab(text: t.t('notas_tab_provas')), // "Próximas Provas"
             ],
           ),
         ),
@@ -42,7 +63,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
     );
   }
 
-  // --- Tab 1: Notas por Disciplina (ATUALIZADO) ---
+  // --- ABA 1: NOTAS POR DISCIPLINA ---
   Widget _buildTabNotas(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final asyncNotas = ref.watch(provedorStreamNotasAluno);
@@ -52,6 +73,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
       loading: () => const WidgetCarregamento(),
       error: (e,s) => Center(child: Text('Erro ao carregar notas: $e')),
       data: (notas) {
+        // Cálculos estatísticos rápidos
         final aprovadas = notas.where((n) => n.status == StatusDisciplina.aprovado).length;
         final emCurso = notas.where((n) => n.status == StatusDisciplina.emCurso).length;
 
@@ -59,6 +81,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             children: [
+              // Card de Estatísticas (CR, Aprovadas, Em Curso)
               Row(
                 children: [
                   Expanded(
@@ -75,11 +98,14 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              
               if (notas.isEmpty)
                 const Center(child: Padding(
                   padding: EdgeInsets.all(32.0),
                   child: Text('Nenhuma nota lançada.'),
                 )),
+                
+              // Lista de Disciplinas (Acordeão)
               ...notas.map((disciplina) {
                 final bool expandir = disciplina.nome.startsWith(disciplinaInicial ?? '');
                 return _buildCardDisciplina(context, t, disciplina, expandir);
@@ -91,7 +117,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
     );
   }
 
-  // --- Tab 2: Próximas Provas (ATUALIZADO) ---
+  // --- ABA 2: PRÓXIMAS PROVAS ---
   Widget _buildTabProvas(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final asyncProvas = ref.watch(provedorStreamCalendario);
@@ -107,6 +133,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             children: [
+              // Aviso de Quantidade
               Card(
                 color: theme.colorScheme.secondaryContainer,
                 child: Padding(
@@ -127,16 +154,20 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                   ),
                 ),
               ),
+              
               if (provas.isEmpty)
                 const Center(child: Padding(
                   padding: EdgeInsets.all(32.0),
                   child: Text('Nenhuma prova agendada.'),
                 )),
+                
+              // Lista de Provas
               ...provas.map((prova) => Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
+                      // Data (Dia/Mês)
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
@@ -157,6 +188,8 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
+                      
+                      // Detalhes (Título, Hora, Local)
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,7 +201,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                               context, 
                               Icons.location_on_outlined, 
                               '${prova.predio} - ${prova.sala}',
-                              isLink: true, 
+                              isLink: true, // Clicável para abrir mapa
                               onTap: () async {
                                 try {
                                   await ref.read(provedorMapas).abrirLocalizacao(prova.predio);
@@ -189,7 +222,6 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                   ),
                 ),
               )),
-              // Card de Sincronizar
             ],
           ),
         );
@@ -197,7 +229,9 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
     );
   }
 
-  // --- Widgets Auxiliares ---
+  // --- WIDGETS AUXILIARES ---
+
+  /// Cartão estatístico pequeno (CR, Aprovadas, etc).
   Widget _buildStatCard(BuildContext context, String label, String value, Color color, [bool isPrimary = false]) {
     final theme = Theme.of(context);
     return Card(
@@ -219,6 +253,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
     );
   }
   
+  /// Cartão expansível de disciplina com notas.
   Widget _buildCardDisciplina(BuildContext context, AppLocalizations t, DisciplinaNotas disciplina, bool expandir) {
     final theme = Theme.of(context);
     return Card(
@@ -254,6 +289,7 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Column(
               children: [
+                // Cabeçalho da Tabela de Notas
                 Row(
                   children: [
                     Expanded(flex: 2, child: Text(t.t('notas_avaliacao'), style: theme.textTheme.bodySmall)),
@@ -263,6 +299,8 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                   ],
                 ),
                 const Divider(),
+                
+                // Lista de Notas
                 ...disciplina.avaliacoes.map((av) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Row(
@@ -278,7 +316,8 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                     ],
                   ),
                 )),
-                // --- CORREÇÃO AQUI: .data -> .dataHora ---
+
+                // Alerta de Próxima Prova (se houver)
                 if (disciplina.proximaProva != null) ...[
                   const Divider(height: 24),
                   Container(
@@ -296,7 +335,10 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('${t.t('notas_proxima_prova')} ${disciplina.proximaProva!.titulo}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text(DateFormat('dd/MM/yyyy \'às\' HH:mm').format(disciplina.proximaProva!.dataHora), style: theme.textTheme.bodySmall), // <-- CORRIGIDO
+                              
+                              // CORREÇÃO AQUI: .dataHora em vez de .data
+                              Text(DateFormat('dd/MM/yyyy \'às\' HH:mm').format(disciplina.proximaProva!.dataHora), style: theme.textTheme.bodySmall),
+                              
                               Text('${t.t('notas_conteudo')}: ${disciplina.proximaProva!.conteudo}', style: theme.textTheme.bodySmall),
                             ],
                           ),
@@ -305,10 +347,9 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                     ),
                   ),
                 ],
-                // --- FIM DA CORREÇÃO ---
               ],
             ),
-          )
+          ),
         ],
       ),
     );

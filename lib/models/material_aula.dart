@@ -10,6 +10,8 @@ class MaterialAula {
   final String url;
   final TipoMaterial tipo;
   final DateTime dataPostagem;
+  // Importante para a busca global de provas antigas
+  final String? nomeBaseDisciplina; 
 
   MaterialAula({
     required this.id,
@@ -18,21 +20,8 @@ class MaterialAula {
     required this.url,
     required this.tipo,
     required this.dataPostagem,
+    this.nomeBaseDisciplina,
   });
-
-  factory MaterialAula.fromMap(Map<String, dynamic> data, String documentId) {
-    return MaterialAula(
-      id: documentId,
-      titulo: data['titulo'] ?? '',
-      descricao: data['descricao'] ?? '',
-      url: data['url'] ?? '',
-      tipo: TipoMaterial.values.firstWhere(
-        (e) => e.name == data['tipo'],
-        orElse: () => TipoMaterial.outro,
-      ),
-      dataPostagem: (data['dataPostagem'] as Timestamp).toDate(),
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -41,6 +30,20 @@ class MaterialAula {
       'url': url,
       'tipo': tipo.name,
       'dataPostagem': Timestamp.fromDate(dataPostagem),
+      'nomeBaseDisciplina': nomeBaseDisciplina,
     };
+  }
+
+  factory MaterialAula.fromMap(Map<String, dynamic> map, String id) {
+    return MaterialAula(
+      id: id,
+      titulo: map['titulo'] ?? '',
+      descricao: map['descricao'] ?? '',
+      url: map['url'] ?? '',
+      tipo: TipoMaterial.values.firstWhere(
+          (e) => e.name == map['tipo'], orElse: () => TipoMaterial.outro),
+      dataPostagem: (map['dataPostagem'] as Timestamp).toDate(),
+      nomeBaseDisciplina: map['nomeBaseDisciplina'],
+    );
   }
 }

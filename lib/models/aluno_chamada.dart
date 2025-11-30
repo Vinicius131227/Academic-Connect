@@ -1,11 +1,11 @@
-/// Um modelo de *visualização* (View Model) usado apenas na tela
-/// de chamada manual (lib/telas/professor/tela_chamada_manual.dart).
-/// **Este objeto não é salvo no Firebase.**
+// lib/models/aluno_chamada.dart
+
+/// Modelo simples usado apenas em tempo de execução para listas de presença.
 class AlunoChamada {
-  final String id; // UID do aluno
+  final String id;
   final String nome;
   final String ra;
-  final bool isPresente;
+  bool isPresente; // Estado local (checkbox)
 
   AlunoChamada({
     required this.id,
@@ -13,14 +13,13 @@ class AlunoChamada {
     required this.ra,
     this.isPresente = false,
   });
-
-  /// Cria uma cópia do objeto, permitindo alterar o status de presença.
+  
   AlunoChamada copyWith({bool? isPresente}) {
     return AlunoChamada(
       id: id,
       nome: nome,
       ra: ra,
-      isPresente: isPresente ?? this.isPresente,
+      isPresente: isPresente ?? this.isPresente
     );
   }
 }

@@ -1,21 +1,43 @@
+// lib/telas/aluno/tela_drive_provas.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
+import 'package:intl/intl.dart'; // Formatação de data
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
+// Importações internas
 import '../../models/material_aula.dart';
 import '../../services/servico_firestore.dart';
-import '../../themes/app_theme.dart';
-import '../comum/widget_carregamento.dart';
-import '../comum/tela_webview.dart';
+import '../../themes/app_theme.dart'; // Cores
+import '../comum/widget_carregamento.dart'; // Loading
+import '../comum/tela_webview.dart'; // Visualizador de PDF/Link
 
-// Provedor para buscar TODAS as provas do sistema
+/// Caso de uso para o Widgetbook.
+/// Simula a tela de Drive de Provas.
+@UseCase(
+  name: 'Drive de Provas',
+  type: TelaDriveProvas,
+)
+Widget buildTelaDriveProvas(BuildContext context) {
+  return const ProviderScope(
+    child: TelaDriveProvas(),
+  );
+}
+
+/// Provedor que busca TODAS as provas do sistema (Query Global).
+/// Usa 'collectionGroup' do Firestore para buscar em subcoleções.
 final driveProvasProvider = StreamProvider<List<MaterialAula>>((ref) {
   return ref.watch(servicoFirestoreProvider).getTodosMateriaisTipoProva();
 });
 
+/// Tela que exibe o banco de provas antigas compartilhadas.
+/// 
+/// Funcionalidades:
+/// - Listagem de provas de todas as disciplinas.
+/// - Busca por nome ou descrição.
+/// - Visualização do arquivo (PDF/Link).
+/// - Botão de contribuição (Upload).
 class TelaDriveProvas extends ConsumerStatefulWidget {
   const TelaDriveProvas({super.key});
 
@@ -25,16 +47,19 @@ class TelaDriveProvas extends ConsumerStatefulWidget {
 
 class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
   final _buscaController = TextEditingController();
-  String _termoBusca = '';
+  String _termoBusca = ''; // Termo digitado na busca
 
   @override
   Widget build(BuildContext context) {
+    // Observa o stream de provas
     final asyncProvas = ref.watch(driveProvasProvider);
+    
+    // Configurações de Tema
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final borderColor = isDark ? Colors.white10 : Colors.black12;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -47,16 +72,17 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
         actions: [
+          // Botão de Upload (Contribuição)
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             onPressed: () => _exibirDialogoUpload(context),
-            tooltip: "Contribuir",
+            tooltip: "Contribuir com Prova",
           )
         ],
       ),
       body: Column(
         children: [
-          // Barra de Busca
+          // 1. BARRA DE BUSCA
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -64,21 +90,26 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
               style: TextStyle(color: textColor),
               decoration: InputDecoration(
                 hintText: "Buscar disciplina ou ano...",
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(color: textColor.withOpacity(0.5)),
+                prefixIcon: Icon(Icons.search, color: textColor.withOpacity(0.5)),
                 filled: true,
                 fillColor: cardColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                // Bordas arredondadas
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderColor)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primaryPurple)),
               ),
               onChanged: (v) => setState(() => _termoBusca = v.toLowerCase()),
             ),
           ),
 
-          // Lista
+          // 2. LISTA DE PROVAS
           Expanded(
             child: asyncProvas.when(
               loading: () => const WidgetCarregamento(texto: "Carregando provas..."),
+              
+              // Tratamento de Erro (Principalmente Índice do Firebase)
               error: (e, s) {
-                 // Log do erro para você clicar no link do terminal
                  debugPrint("ERRO NO FIREBASE (DRIVE): $e");
                  
                  return Center(
@@ -87,24 +118,27 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.warning_amber_rounded, size: 48, color: AppColors.error),
+                        const Icon(Icons.warning_amber_rounded, size: 48, color: AppColors.error),
                         const SizedBox(height: 16),
                         Text(
-                          "Índice necessário", 
-                          style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
+                          "Configuração Necessária", 
+                          style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18)
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          "Olhe o terminal (debug console) e clique no link para criar o índice no Firebase.",
+                        Text(
+                          "O índice de pesquisa global ainda não foi criado no banco de dados.\nVerifique o console para o link de criação.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(color: textColor.withOpacity(0.7)),
                         ),
                       ],
                     ),
                   ),
                 );
               },
+              
+              // Dados Carregados
               data: (materiais) {
+                // Filtra localmente pelo termo de busca
                 final filtrados = materiais.where((m) {
                   return m.titulo.toLowerCase().contains(_termoBusca) || 
                          m.descricao.toLowerCase().contains(_termoBusca);
@@ -128,11 +162,18 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                   itemCount: filtrados.length,
                   itemBuilder: (context, index) {
                     final material = filtrados[index];
+                    
+                    // Cartão de Arquivo
                     return Card(
                       color: cardColor,
                       margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 0,
+                      elevation: 2, // Sombra suave
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: borderColor)
+                      ),
                       child: ListTile(
+                        // Ícone Laranja para destacar que é Prova
                         leading: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
@@ -141,16 +182,23 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                           ),
                           child: const Icon(Icons.description, color: Colors.orange),
                         ),
+                        
                         title: Text(
                           material.titulo, 
                           style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
                         ),
+                        
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (material.descricao.isNotEmpty)
-                              Text(material.descricao, style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12)),
+                              Text(
+                                material.descricao, 
+                                style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 12)
+                              ),
                             const SizedBox(height: 4),
+                            
+                            // Data de Postagem
                             Row(
                               children: [
                                 Icon(Icons.access_time, size: 12, color: textColor.withOpacity(0.5)),
@@ -163,7 +211,10 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
                             )
                           ],
                         ),
+                        
                         trailing: Icon(Icons.download_rounded, color: textColor.withOpacity(0.5)),
+                        
+                        // Ação ao clicar: Abrir WebView
                         onTap: () {
                            Navigator.push(
                              context, 
@@ -182,15 +233,27 @@ class _TelaDriveProvasState extends ConsumerState<TelaDriveProvas> {
     );
   }
 
+  /// Exibe um diálogo simulando o upload de arquivos (Feature futura).
   void _exibirDialogoUpload(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dialogColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = theme.textTheme.bodyLarge?.color;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).cardTheme.color,
-        title: const Text("Enviar Prova"),
-        content: const Text("O upload de arquivos será liberado em breve pelo C.A."),
+        backgroundColor: dialogColor,
+        title: Text("Enviar Prova", style: TextStyle(color: textColor)),
+        content: Text(
+          "O upload de arquivos será liberado em breve pela moderação do C.A.\nObrigado pelo interesse em contribuir!", 
+          style: TextStyle(color: textColor?.withOpacity(0.8))
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx), 
+            child: const Text("OK")
+          ),
         ],
       ),
     );

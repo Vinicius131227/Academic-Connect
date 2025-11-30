@@ -1,53 +1,70 @@
+// lib/telas/login/tela_login.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import 'tela_esqueceu_senha.dart'; 
-import '../../l10n/app_localizations.dart';
-import 'tela_cadastro_usuario.dart';
-import 'portao_autenticacao.dart'; // Importante para o redirecionamento
-import '../comum/overlay_carregamento.dart'; 
-import '../../themes/app_theme.dart'; 
+import '../../l10n/app_localizations.dart'; // Traduções
+import 'tela_cadastro_usuario.dart'; // Cadastro
+import 'portao_autenticacao.dart'; // Redirecionamento (Home)
+import '../comum/overlay_carregamento.dart'; // Loading
+import '../../themes/app_theme.dart'; // Cores
 
+/// Tela de Login principal.
+/// Permite autenticação por e-mail e senha ou provedores sociais (Google).
 class TelaLogin extends ConsumerStatefulWidget {
   const TelaLogin({super.key});
+  
   @override
   ConsumerState<TelaLogin> createState() => _TelaLoginState();
 }
 
 class _TelaLoginState extends ConsumerState<TelaLogin> {
+  // Controladores de texto para os campos
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  
+  // Chave global para validação do formulário
   final _formKey = GlobalKey<FormState>();
+  
+  // Estado para ocultar/mostrar senha
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    // Limpeza de memória
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  /// Lógica de Login por E-mail e Senha.
   Future<void> _login() async {
+      // 1. Valida os campos
       if (_formKey.currentState!.validate()) {
-        // Ativa o loading global
+        // 2. Ativa o loading global (Overlay)
         ref.read(provedorCarregando.notifier).state = true;
         
-        // Chama o login. NÃO navegamos aqui manualmente. 
-        // O listener (ref.listen) abaixo fará isso ao detectar a mudança de estado.
         try {
+          // 3. Chama o provedor de autenticação
+          // Se der sucesso, o estado muda e o listener no build redireciona.
           await ref.read(provedorNotificadorAutenticacao.notifier).login(
                 _emailController.text.trim(),
                 _passwordController.text.trim(),
               );
         } catch (e) {
-           // Erro já tratado no provider, mas garantimos parar o loading aqui se algo escapar
+           // Erros são capturados aqui, mas o feedback visual é feito pelo listener
         } finally {
+           // 4. Desativa o loading (sempre)
            if (mounted) ref.read(provedorCarregando.notifier).state = false;
         }
       }
   }
 
+  /// Lógica de Login com Google.
   Future<void> _loginGoogle() async {
     ref.read(provedorCarregando.notifier).state = true;
     try {
@@ -59,19 +76,18 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!;
+    final t = AppLocalizations.of(context)!; // Acesso às traduções
     final estaCarregando = ref.watch(provedorCarregando);
     final size = MediaQuery.of(context).size;
-    final bool isDesktop = size.width > 800;
+    final bool isDesktop = size.width > 800; // Breakpoint para layout desktop
 
-    // --- TEMA DINÂMICO ---
+    // --- CORES DINÂMICAS (TEMA) ---
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Cores Adaptáveis
     final textColor = isDark ? Colors.white : Colors.black87;
-    // Usamos ! para garantir que a cor não é nula e evitar erro no withOpacity
-    final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
+    // Garante cor não nula para uso com transparência
+    final subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final dividerColor = isDark ? Colors.white24 : Colors.black12;
     final inputBorderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
 
@@ -80,15 +96,20 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
       // Se houver erro, mostra SnackBar
       if (next.erro != null && previous?.erro != next.erro) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.erro!), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text(next.erro!), 
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
       
-      // Se autenticou com sucesso, navega para o Portão (que vai pra Home)
+      // Se autenticou com sucesso, navega para o Portão (Home)
+      // pushAndRemoveUntil remove a tela de login da pilha (botão voltar fecha o app)
       if (next.status == StatusAutenticacao.autenticado) {
          Navigator.of(context).pushAndRemoveUntil(
            MaterialPageRoute(builder: (_) => const PortaoAutenticacao()),
-           (route) => false, // Remove o histórico de login
+           (route) => false, 
          );
       }
     });
@@ -126,7 +147,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 24),
                         
-                        // Títulos de Boas-vindas
+                        // Títulos
                         Text(
                           t.t('login_titulo'), 
                           style: GoogleFonts.poppins(
@@ -185,7 +206,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Botão Login
+                        // Botão Login Principal
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -251,7 +272,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         
                         const SizedBox(height: 24),
                         
-                        // Link Cadastro
+                        // Link para Cadastro
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center, 
                           children: [
@@ -279,7 +300,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
             ),
           ),
           
-          // --- LADO DIREITO: ARTE (Apenas Desktop) ---
+          // --- LADO DIREITO: ARTE (Apenas Desktop/Web Grande) ---
           if (isDesktop) 
             Expanded(
               flex: 5, 
@@ -301,7 +322,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                       style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)
                     ),
                     const SizedBox(height: 40),
-                    // Ícone Grande
+                    // Ícone Grande Ilustrativo
                     const Icon(Icons.school_rounded, size: 200, color: Colors.white24),
                   ],
                 ),
@@ -312,6 +333,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
     );
   }
 
+  /// Widget auxiliar para criar campos de texto estilizados.
   Widget _buildTextField({
     required String label, 
     String? hint, 
@@ -341,7 +363,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
           style: TextStyle(color: textColor),
           decoration: InputDecoration(
             hintText: hint, 
-            // Placeholder transparente para não confundir
+            // Placeholder transparente para não parecer texto digitado
             hintStyle: TextStyle(color: subTextColor.withOpacity(0.3)), 
             prefixIcon: Icon(icon, color: subTextColor),
             suffixIcon: isPassword 
@@ -354,7 +376,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                   ) 
                 : null,
             filled: true,
-            fillColor: Colors.transparent, 
+            fillColor: Colors.transparent,
             contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
             enabledBorder: UnderlineInputBorder(
               borderSide: BorderSide(color: borderColor),

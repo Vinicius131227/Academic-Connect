@@ -1,15 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-class TtsService {
-  late FlutterTts _flutterTts;
+class ServicoTTS {
+  final FlutterTts _flutterTts = FlutterTts();
 
-  TtsService() {
-    _flutterTts = FlutterTts();
-    // Configura o idioma para Português do Brasil
+  ServicoTTS() {
     _flutterTts.setLanguage("pt-BR");
-    _flutterTts.setSpeechRate(0.5); // Velocidade da fala
-    _flutterTts.setPitch(1.0); // Tom
+    _flutterTts.setSpeechRate(0.5);
   }
 
   Future<void> speak(String text) async {
@@ -17,7 +14,6 @@ class TtsService {
   }
 }
 
-// O provedor que os outros provedores vão usar para falar
-final ttsProvider = Provider<TtsService>((ref) {
-  return TtsService();
-});
+final provedorTTS = Provider<ServicoTTS>((ref) => ServicoTTS());
+// Alias para compatibilidade com código anterior
+final ttsProvider = provedorTTS;

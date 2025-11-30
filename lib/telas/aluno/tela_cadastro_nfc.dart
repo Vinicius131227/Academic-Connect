@@ -1,21 +1,41 @@
-// lib/telas/aluno/tela_cadastro_nfc.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+
+// Importações internas
 import '../../providers/provedor_aluno.dart';
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 import '../comum/cartao_vidro.dart';
 
+/// Caso de uso para o Widgetbook.
+@UseCase(
+  name: 'Cadastro NFC',
+  type: TelaCadastroNFC,
+)
+Widget buildTelaCadastroNFC(BuildContext context) {
+  return const ProviderScope(
+    child: TelaCadastroNFC(),
+  );
+}
+
+/// Tela que permite ao aluno cadastrar seu cartão NFC.
 class TelaCadastroNFC extends ConsumerWidget {
   const TelaCadastroNFC({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
+    
     final estado = ref.watch(provedorCadastroNFC);
     final notifier = ref.read(provedorCadastroNFC.notifier);
+    
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Texto branco se fundo escuro, preto se fundo claro
+    final textColor = isDark ? Colors.white : Colors.black87;
 
+    /// Constrói o conteúdo central com base no estado atual
     Widget buildContent() {
       switch (estado.status) {
         case StatusCadastroNFC.scanning:
@@ -26,22 +46,22 @@ class TelaCadastroNFC extends ConsumerWidget {
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryPurple),
               ),
               const SizedBox(height: 32),
-              Icon(Icons.nfc,
-                  size: 100, color: AppColors.primaryPurple),
+              const Icon(Icons.nfc, size: 100, color: AppColors.primaryPurple),
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_aguardando'),
-                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
+                style: theme.textTheme.headlineSmall?.copyWith(color: textColor),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 t.t('nfc_cadastro_instrucao'),
-                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                style: theme.textTheme.bodyLarge?.copyWith(color: textColor.withOpacity(0.7)),
                 textAlign: TextAlign.center,
               ),
             ],
           );
+          
         case StatusCadastroNFC.success:
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -50,23 +70,24 @@ class TelaCadastroNFC extends ConsumerWidget {
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_sucesso'),
-                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
+                style: theme.textTheme.headlineSmall?.copyWith(color: textColor),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 '${t.t('nfc_cadastro_uid')} ${estado.uid}',
-                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                style: theme.textTheme.bodyLarge?.copyWith(color: textColor.withOpacity(0.7)),
                 textAlign: TextAlign.center,
               ),
             ],
           );
+          
         case StatusCadastroNFC.error:
         case StatusCadastroNFC.unsupported:
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error, size: 120, color: AppColors.error),
+              const Icon(Icons.error, size: 120, color: AppColors.error),
               const SizedBox(height: 24),
               Text(
                 estado.status == StatusCadastroNFC.error
@@ -78,29 +99,28 @@ class TelaCadastroNFC extends ConsumerWidget {
               const SizedBox(height: 16),
               Text(
                 estado.erro ?? 'Um erro desconhecido ocorreu.',
-                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                style: theme.textTheme.bodyLarge?.copyWith(color: textColor.withOpacity(0.7)),
                 textAlign: TextAlign.center,
               ),
             ],
           );
+          
         case StatusCadastroNFC.idle:
         default:
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Ícone visível com a cor do tema
-              Icon(Icons.nfc,
-                  size: 120, color: AppColors.primaryPurple.withOpacity(0.5)),
+              Icon(Icons.nfc, size: 120, color: AppColors.primaryPurple.withOpacity(0.5)),
               const SizedBox(height: 24),
               Text(
                 t.t('nfc_cadastro_titulo'),
-                style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white),
+                style: theme.textTheme.headlineSmall?.copyWith(color: textColor),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               Text(
                 t.t('nfc_cadastro_instrucao'),
-                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                style: theme.textTheme.bodyLarge?.copyWith(color: textColor.withOpacity(0.7)),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -108,6 +128,7 @@ class TelaCadastroNFC extends ConsumerWidget {
       }
     }
 
+    /// Constrói os botões de ação
     Widget buildButtons() {
       switch (estado.status) {
         case StatusCadastroNFC.scanning:
@@ -121,6 +142,7 @@ class TelaCadastroNFC extends ConsumerWidget {
             ),
             onPressed: () => notifier.reset(),
           );
+          
         case StatusCadastroNFC.success:
           return ElevatedButton.icon(
             icon: const Icon(Icons.save),
@@ -137,6 +159,7 @@ class TelaCadastroNFC extends ConsumerWidget {
               }
             },
           );
+          
         case StatusCadastroNFC.error:
         case StatusCadastroNFC.unsupported:
           return ElevatedButton.icon(
@@ -147,6 +170,7 @@ class TelaCadastroNFC extends ConsumerWidget {
             ),
             onPressed: () => Navigator.pop(context),
           );
+          
         case StatusCadastroNFC.idle:
         default:
           return ElevatedButton.icon(
@@ -154,6 +178,7 @@ class TelaCadastroNFC extends ConsumerWidget {
             label: Text(t.t('nfc_cadastro_iniciar')),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryPurple,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
             onPressed: () => notifier.iniciarLeitura(),
@@ -182,28 +207,33 @@ class TelaCadastroNFC extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.t('nfc_cadastro_titulo')),
+        title: Text(t.t('nfc_cadastro_titulo'), style: TextStyle(color: textColor)),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: textColor),
       ),
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: true, 
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF2C2C2C), AppColors.background],
+            colors: isDark 
+                ? [const Color(0xFF2C2C2C), AppColors.backgroundDark] 
+                : [Colors.grey.shade100, Colors.white],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
         ),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
-              child: CartaoVidro(child: cardContentWrapper),
+              // CORREÇÃO: Removido bgColor e borderColor, usando apenas child
+              child: CartaoVidro(
+                child: cardContentWrapper
+              ),
             ),
           ),
         ),

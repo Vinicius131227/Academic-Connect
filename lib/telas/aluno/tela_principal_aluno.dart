@@ -1,7 +1,7 @@
 // lib/telas/aluno/tela_principal_aluno.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../servico_preferencias.dart'; 
+import '../../services/servico_preferencias.dart'; 
 import '../comum/tela_configuracoes.dart';
 import 'aba_inicio_aluno.dart';
 import 'aba_disciplinas_aluno.dart';

@@ -1,14 +1,31 @@
+// lib/telas/aluno/tela_calendario.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:table_calendar/table_calendar.dart'; // Pacote de calendário
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+
+// Importações internas
 import '../../providers/provedores_app.dart';
 import '../../themes/app_theme.dart';
 import '../../models/prova_agendada.dart';
 import '../comum/widget_carregamento.dart';
-import 'package:intl/intl.dart';
 
+/// Caso de uso para o Widgetbook.
+@UseCase(
+  name: 'Calendário Acadêmico',
+  type: TelaCalendario,
+)
+Widget buildTelaCalendario(BuildContext context) {
+  return const ProviderScope(
+    child: TelaCalendario(),
+  );
+}
+
+/// Modelo simples para representar um feriado vindo da API externa.
 class Feriado {
   final DateTime data;
   final String nome;
@@ -22,6 +39,8 @@ class Feriado {
   }
 }
 
+/// Provedor que busca os feriados nacionais do Brasil para o ano atual.
+/// Usa a API pública Nager.Date.
 final feriadosProvider = FutureProvider<List<Feriado>>((ref) async {
   final ano = DateTime.now().year;
   try {
@@ -32,10 +51,12 @@ final feriadosProvider = FutureProvider<List<Feriado>>((ref) async {
     }
     return [];
   } catch (e) {
-    return [];
+    return []; // Retorna vazio se falhar (sem internet)
   }
 });
 
+/// Tela de Calendário que mostra eventos acadêmicos e feriados.
+/// Permite ao aluno visualizar suas entregas e provas.
 class TelaCalendario extends ConsumerStatefulWidget {
   const TelaCalendario({super.key});
 
@@ -44,6 +65,7 @@ class TelaCalendario extends ConsumerStatefulWidget {
 }
 
 class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
+  // Configurações do calendário
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -54,6 +76,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
     _selectedDay = _focusedDay;
   }
 
+  /// Verifica se duas datas correspondem ao mesmo dia (ignora hora).
   bool _isSameDay(DateTime? a, DateTime? b) {
     if (a == null || b == null) return false;
     return a.year == b.year && a.month == b.month && a.day == b.day;
@@ -61,15 +84,17 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
 
   @override
   Widget build(BuildContext context) {
+    // Busca dados assíncronos
     final asyncProvas = ref.watch(provedorStreamCalendario);
     final asyncFeriados = ref.watch(feriadosProvider);
     
-    // --- TEMA DINÂMICO ---
+    // Tema Dinâmico
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black87;
+    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
     final calendarBg = isDark ? AppColors.surfaceDark : Colors.white;
+    final shadowColor = isDark ? Colors.transparent : Colors.black.withOpacity(0.05);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -79,21 +104,26 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
       ),
+      // Carrega provas primeiro
       body: asyncProvas.when(
         loading: () => const WidgetCarregamento(),
         error: (e, s) => Center(child: Text('Erro: $e', style: TextStyle(color: textColor))),
         data: (provas) {
+          // Carrega feriados depois
           return asyncFeriados.when(
             loading: () => const WidgetCarregamento(),
-            error: (_,__) => _buildCalendarContent(provas, [], textColor, calendarBg, cardColor),
-            data: (feriados) => _buildCalendarContent(provas, feriados, textColor, calendarBg, cardColor),
+            // Se falhar feriados, mostra só provas
+            error: (_,__) => _buildCalendarContent(provas, [], textColor, calendarBg, cardColor, shadowColor),
+            data: (feriados) => _buildCalendarContent(provas, feriados, textColor, calendarBg, cardColor, shadowColor),
           );
         },
       ),
     );
   }
 
-  Widget _buildCalendarContent(List<ProvaAgendada> provas, List<Feriado> feriados, Color textColor, Color calendarBg, Color cardColor) {
+  /// Constrói o conteúdo principal: Calendário + Lista de Eventos do Dia.
+  Widget _buildCalendarContent(List<ProvaAgendada> provas, List<Feriado> feriados, Color textColor, Color calendarBg, Color cardColor, Color shadowColor) {
+    // Filtra eventos para o dia selecionado
     final eventosDoDia = [
       ...provas.where((p) => _isSameDay(p.dataHora, _selectedDay)),
       ...feriados.where((f) => _isSameDay(f.data, _selectedDay)),
@@ -101,13 +131,14 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
 
     return Column(
       children: [
+        // --- WIDGET DE CALENDÁRIO ---
         Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: calendarBg,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
+              BoxShadow(color: shadowColor, blurRadius: 10, offset: const Offset(0, 4))
             ]
           ),
           child: TableCalendar(
@@ -117,7 +148,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             
-            // Estilos Corrigidos para Light/Dark
+            // Estilização
             headerStyle: HeaderStyle(
               titleCentered: true,
               formatButtonVisible: false,
@@ -138,11 +169,12 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                 shape: BoxShape.circle,
               ),
               markerDecoration: const BoxDecoration(
-                color: AppColors.cardOrange,
+                color: AppColors.cardOrange, // Bolinha indicadora de evento
                 shape: BoxShape.circle,
               ),
             ),
 
+            // Carrega os eventos para mostrar as bolinhas nos dias
             eventLoader: (day) {
               final temProva = provas.any((p) => _isSameDay(p.dataHora, day));
               final temFeriado = feriados.any((f) => _isSameDay(f.data, day));
@@ -165,6 +197,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
 
         const SizedBox(height: 16),
         
+        // --- LISTA DE DETALHES DO DIA ---
         Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -176,8 +209,14 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
                 ),
                 const SizedBox(height: 16),
+                
                 if (eventosDoDia.isEmpty)
-                  Center(child: Text("Nada agendado para este dia.", style: TextStyle(color: textColor.withOpacity(0.5))))
+                  Center(
+                    child: Text(
+                      "Nada agendado para este dia.", 
+                      style: TextStyle(color: textColor.withOpacity(0.5))
+                    )
+                  )
                 else
                   Expanded(
                     child: ListView.builder(
@@ -185,12 +224,13 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                       itemBuilder: (context, index) {
                         final evento = eventosDoDia[index];
                         
+                        // Card de Prova
                         if (evento is ProvaAgendada) {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.cardBlue, // Azul para Provas
+                              color: AppColors.cardBlue, 
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
@@ -210,12 +250,14 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                               ],
                             ),
                           );
-                        } else if (evento is Feriado) {
+                        } 
+                        // Card de Feriado
+                        else if (evento is Feriado) {
                            return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.cardOrange, // Laranja para Feriados
+                              color: AppColors.cardOrange, 
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
