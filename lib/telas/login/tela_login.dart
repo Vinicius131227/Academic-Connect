@@ -1,74 +1,73 @@
-// lib/telas/login/tela_login.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// Importações internas
+// Importações Internas
 import '../../providers/provedor_autenticacao.dart';
 import 'tela_esqueceu_senha.dart'; 
-import '../../l10n/app_localizations.dart'; // Traduções
-import 'tela_cadastro_usuario.dart'; // Cadastro
-import 'portao_autenticacao.dart'; // Redirecionamento (Home)
-import '../comum/overlay_carregamento.dart'; // Loading
-import '../../themes/app_theme.dart'; // Cores
+import '../../l10n/app_localizations.dart';
+import 'tela_cadastro_usuario.dart';
+import 'portao_autenticacao.dart'; // Importante para o redirecionamento
+import '../comum/overlay_carregamento.dart'; 
+import '../../themes/app_theme.dart'; 
 
-/// Tela de Login principal.
-/// Permite autenticação por e-mail e senha ou provedores sociais (Google).
 class TelaLogin extends ConsumerStatefulWidget {
   const TelaLogin({super.key});
-  
   @override
   ConsumerState<TelaLogin> createState() => _TelaLoginState();
 }
 
 class _TelaLoginState extends ConsumerState<TelaLogin> {
-  // Controladores de texto para os campos
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
-  // Chave global para validação do formulário
   final _formKey = GlobalKey<FormState>();
-  
-  // Estado para ocultar/mostrar senha
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    // Limpeza de memória
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  /// Lógica de Login por E-mail e Senha.
+  // --- LÓGICA DE LOGIN (E-MAIL/SENHA) ---
   Future<void> _login() async {
-      // 1. Valida os campos
       if (_formKey.currentState!.validate()) {
-        // 2. Ativa o loading global (Overlay)
+        // 1. Ativa o loading
         ref.read(provedorCarregando.notifier).state = true;
         
         try {
-          // 3. Chama o provedor de autenticação
-          // Se der sucesso, o estado muda e o listener no build redireciona.
+          // 2. Tenta o login
           await ref.read(provedorNotificadorAutenticacao.notifier).login(
                 _emailController.text.trim(),
                 _passwordController.text.trim(),
               );
+          // Se der sucesso, o 'ref.listen' abaixo cuidará da navegação.
         } catch (e) {
-           // Erros são capturados aqui, mas o feedback visual é feito pelo listener
+           // Erros de exceção direta (que não passaram pelo estado)
+           if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text("Erro: $e"), backgroundColor: AppColors.error)
+             );
+           }
         } finally {
-           // 4. Desativa o loading (sempre)
+           // 3. IMPORTANTE: Para o loading independente do resultado
            if (mounted) ref.read(provedorCarregando.notifier).state = false;
         }
       }
   }
 
-  /// Lógica de Login com Google.
+  // --- LÓGICA DE LOGIN (GOOGLE) ---
   Future<void> _loginGoogle() async {
     ref.read(provedorCarregando.notifier).state = true;
     try {
       await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
+    } catch (e) {
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text("Erro Google: $e"), backgroundColor: AppColors.error)
+         );
+      }
     } finally {
       if (mounted) ref.read(provedorCarregando.notifier).state = false;
     }
@@ -76,24 +75,22 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!; // Acesso às traduções
+    final t = AppLocalizations.of(context)!;
     final estaCarregando = ref.watch(provedorCarregando);
     final size = MediaQuery.of(context).size;
-    final bool isDesktop = size.width > 800; // Breakpoint para layout desktop
+    final bool isDesktop = size.width > 800;
 
-    // --- CORES DINÂMICAS (TEMA) ---
+    // --- TEMA DINÂMICO ---
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
     final textColor = isDark ? Colors.white : Colors.black87;
-    // Garante cor não nula para uso com transparência
     final subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final dividerColor = isDark ? Colors.white24 : Colors.black12;
     final inputBorderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
 
-    // --- ESCUTA DE ESTADO (REDIRECIONAMENTO) ---
+    // --- MONITORAMENTO DE ESTADO (REDIRECIONAMENTO E ERROS) ---
     ref.listen(provedorNotificadorAutenticacao, (previous, next) {
-      // Se houver erro, mostra SnackBar
+      // 1. Se houver erro novo, mostra SnackBar
       if (next.erro != null && previous?.erro != next.erro) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -104,12 +101,11 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
         );
       }
       
-      // Se autenticou com sucesso, navega para o Portão (Home)
-      // pushAndRemoveUntil remove a tela de login da pilha (botão voltar fecha o app)
+      // 2. Se autenticou com sucesso, navega para o Portão (Home)
       if (next.status == StatusAutenticacao.autenticado) {
          Navigator.of(context).pushAndRemoveUntil(
            MaterialPageRoute(builder: (_) => const PortaoAutenticacao()),
-           (route) => false, 
+           (route) => false, // Remove o histórico de login para não voltar com "Back"
          );
       }
     });
@@ -174,6 +170,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                           textColor: textColor,
                           subTextColor: subTextColor,
                           borderColor: inputBorderColor,
+                          isDark: isDark,
                         ),
                         const SizedBox(height: 20),
                         
@@ -188,6 +185,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                           textColor: textColor,
                           subTextColor: subTextColor,
                           borderColor: inputBorderColor,
+                          isDark: isDark,
                         ),
 
                         // Esqueceu a senha
@@ -206,7 +204,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Botão Login Principal
+                        // Botão Login
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -259,12 +257,14 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center, 
                               children: [
-                                Image.asset('assets/images/google_logo.png', height: 24), 
+                                Image.asset(
+                                  'assets/images/google_logo.png', 
+                                  height: 24,
+                                  // Fallback caso a imagem não carregue
+                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.login, size: 24),
+                                ), 
                                 const SizedBox(width: 12), 
-                                Text(
-                                  'Google', 
-                                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500)
-                                )
+                                const Text('Google')
                               ]
                             ),
                           ),
@@ -272,7 +272,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                         
                         const SizedBox(height: 24),
                         
-                        // Link para Cadastro
+                        // Link Cadastro
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center, 
                           children: [
@@ -300,7 +300,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
             ),
           ),
           
-          // --- LADO DIREITO: ARTE (Apenas Desktop/Web Grande) ---
+          // --- LADO DIREITO: ARTE (Apenas Desktop) ---
           if (isDesktop) 
             Expanded(
               flex: 5, 
@@ -322,7 +322,6 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
                       style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white)
                     ),
                     const SizedBox(height: 40),
-                    // Ícone Grande Ilustrativo
                     const Icon(Icons.school_rounded, size: 200, color: Colors.white24),
                   ],
                 ),
@@ -333,7 +332,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
     );
   }
 
-  /// Widget auxiliar para criar campos de texto estilizados.
+  // Widget Auxiliar para Campos de Texto
   Widget _buildTextField({
     required String label, 
     String? hint, 
@@ -344,6 +343,7 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
     required Color textColor,
     required Color subTextColor,
     required Color borderColor,
+    required bool isDark
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,13 +363,12 @@ class _TelaLoginState extends ConsumerState<TelaLogin> {
           style: TextStyle(color: textColor),
           decoration: InputDecoration(
             hintText: hint, 
-            // Placeholder transparente para não parecer texto digitado
             hintStyle: TextStyle(color: subTextColor.withOpacity(0.3)), 
             prefixIcon: Icon(icon, color: subTextColor),
             suffixIcon: isPassword 
                 ? IconButton(
                     icon: Icon(
-                      isObscure ? Icons.visibility_off : Icons.visibility, 
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility, 
                       color: subTextColor
                     ), 
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword)
