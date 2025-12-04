@@ -54,12 +54,6 @@ final aulasTurmaProvider = StreamProvider.family<QuerySnapshot, String>((ref, tu
 });
 
 /// Tela principal de detalhes de uma disciplina para o aluno (Hub).
-/// 
-/// Exibe:
-/// 1. Botões para Chat e Materiais.
-/// 2. Card de Informações Gerais (Professor e Frequência).
-/// 3. Lista de Notas e Avaliações.
-/// 4. Próximas Provas agendadas.
 class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
   final TurmaProfessor turma;
   
@@ -106,7 +100,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
       // FAB para acesso rápido ao Chat
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-           Navigator.push(context, MaterialPageRoute(builder: (_) => _TelaChatIsolada(turmaId: turma.id, nomeDisciplina: turma.nome)));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => _TelaChatIsolada(turmaId: turma.id, nomeDisciplina: turma.nome)));
         },
         backgroundColor: AppColors.primaryPurple,
         icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
@@ -119,7 +113,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. Botões de Ação (Materiais)
-            // O Chat fica no FAB, então aqui deixamos Materiais em destaque
             Row(
               children: [
                 Expanded(
@@ -131,16 +124,16 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                     cardColor: cardColor, 
                     textColor: textColor, 
                     onTap: () {
-                       Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
-                         appBar: AppBar(
-                           title: Text(t.t('hub_materiais'), style: TextStyle(color: textColor)), 
-                           backgroundColor: bgColor, 
-                           iconTheme: IconThemeData(color: textColor), 
-                           elevation: 0
-                         ),
-                         backgroundColor: bgColor,
-                         body: AbaMateriaisAluno(turmaId: turma.id, nomeDisciplina: turma.nome),
-                       )));
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(
+                          appBar: AppBar(
+                            title: Text(t.t('hub_materiais'), style: TextStyle(color: textColor)), 
+                            backgroundColor: bgColor, 
+                            iconTheme: IconThemeData(color: textColor), 
+                            elevation: 0
+                          ),
+                          backgroundColor: bgColor,
+                          body: AbaMateriaisAluno(turmaId: turma.id, nomeDisciplina: turma.nome),
+                        )));
                     }
                   ),
                 ),
@@ -243,7 +236,8 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                      color: cardColor, 
                      child: Padding(
                        padding: const EdgeInsets.all(16), 
-                       child: Center(child: Text("Nenhuma nota lançada.", style: TextStyle(color: subTextColor)))
+                       // CORREÇÃO: Tradução inserida aqui
+                       child: Center(child: Text(t.t('detalhes_sem_notas'), style: TextStyle(color: subTextColor)))
                      )
                    );
                 }
@@ -289,7 +283,8 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                      color: cardColor, 
                      child: Padding(
                        padding: const EdgeInsets.all(16), 
-                       child: Center(child: Text("Nenhuma prova agendada.", style: TextStyle(color: subTextColor)))
+                       // CORREÇÃO: Tradução inserida aqui
+                       child: Center(child: Text(t.t('detalhes_sem_provas'), style: TextStyle(color: subTextColor)))
                      )
                    );
                 }
@@ -364,12 +359,12 @@ class _TelaChatIsolada extends StatelessWidget {
   Widget build(BuildContext context) {
      final theme = Theme.of(context);
      final textColor = theme.textTheme.bodyLarge?.color;
-     // Recupera traduções locais se necessário
-     // final t = AppLocalizations.of(context)!;
+     final t = AppLocalizations.of(context)!; // Recupera traduções
 
      return Scaffold(
        appBar: AppBar(
-         title: Text("Chat: $nomeDisciplina", style: TextStyle(color: textColor)),
+         // CORREÇÃO: Título traduzido "Chat: Cálculo 1"
+         title: Text(t.t('chat_titulo_sala', args: [nomeDisciplina]), style: TextStyle(color: textColor)),
          iconTheme: IconThemeData(color: textColor),
          backgroundColor: theme.scaffoldBackgroundColor,
          elevation: 0,

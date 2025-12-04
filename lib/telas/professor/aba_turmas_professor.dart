@@ -52,22 +52,6 @@ class AbaTurmasProfessor extends ConsumerWidget {
       
       body: CustomScrollView(
         slivers: [
-          // 1. Título Grande no Topo
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
-              child: Text(
-                t.t('prof_turmas_titulo'), // "Minhas Turmas"
-                style: GoogleFonts.poppins(
-                  fontSize: 32, 
-                  fontWeight: FontWeight.bold, 
-                  color: textColor, 
-                  height: 1.1
-                ),
-              ),
-            ),
-          ),
-
           // 2. Grade de Turmas
           asyncTurmas.when(
             loading: () => const SliverToBoxAdapter(child: WidgetCarregamento()),

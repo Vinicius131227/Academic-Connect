@@ -24,10 +24,6 @@ Widget buildTelaConfiguracoes(BuildContext context) {
 }
 
 /// Tela de Configurações Gerais do Aplicativo.
-/// Permite:
-/// - Trocar Tema (Claro/Escuro/Sistema).
-/// - Trocar Idioma (PT/EN/ES).
-/// - Fazer Logout.
 class TelaConfiguracoes extends ConsumerWidget {
   const TelaConfiguracoes({super.key});
 
@@ -122,7 +118,7 @@ class TelaConfiguracoes extends ConsumerWidget {
                   ),
                   Divider(height: 1, color: textColor?.withOpacity(0.1)),
                   _buildRadioItem(
-                    t.t('config_tema_sistema'), // "Sistema"
+                    t.t('config_tema_sistema'), 
                     temaAtual == ModoSistemaTema.sistema, 
                     textColor, 
                     () => ref.read(provedorNotificadorTema.notifier).mudarTema(ModoSistemaTema.sistema)
@@ -144,21 +140,21 @@ class TelaConfiguracoes extends ConsumerWidget {
               child: Column(
                 children: [
                   _buildRadioItem(
-                    "Português", 
+                    "Português", // Texto fixo na língua nativa
                     localeAtual.languageCode == 'pt', 
                     textColor, 
                     () => ref.read(provedorLocalizacao.notifier).mudarLingua('pt')
                   ),
                   Divider(height: 1, color: textColor?.withOpacity(0.1)),
                   _buildRadioItem(
-                    "English", 
+                    "English", // Texto fixo na língua nativa
                     localeAtual.languageCode == 'en', 
                     textColor, 
                     () => ref.read(provedorLocalizacao.notifier).mudarLingua('en')
                   ),
                   Divider(height: 1, color: textColor?.withOpacity(0.1)),
                   _buildRadioItem(
-                    "Español", 
+                    "Español", // Texto fixo na língua nativa
                     localeAtual.languageCode == 'es', 
                     textColor, 
                     () => ref.read(provedorLocalizacao.notifier).mudarLingua('es')

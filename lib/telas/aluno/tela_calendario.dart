@@ -13,6 +13,7 @@ import '../../providers/provedores_app.dart';
 import '../../themes/app_theme.dart';
 import '../../models/prova_agendada.dart';
 import '../comum/widget_carregamento.dart';
+import '../../l10n/app_localizations.dart'; // Import da localização
 
 /// Caso de uso para o Widgetbook.
 @UseCase(
@@ -87,6 +88,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
     // Busca dados assíncronos
     final asyncProvas = ref.watch(provedorStreamCalendario);
     final asyncFeriados = ref.watch(feriadosProvider);
+    final t = AppLocalizations.of(context)!;
     
     // Tema Dinâmico
     final theme = Theme.of(context);
@@ -99,7 +101,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Calendário Acadêmico', style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        title: Text(t.t('calendario_titulo_screen'), style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
@@ -107,7 +109,7 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
       // Carrega provas primeiro
       body: asyncProvas.when(
         loading: () => const WidgetCarregamento(),
-        error: (e, s) => Center(child: Text('Erro: $e', style: TextStyle(color: textColor))),
+        error: (e, s) => Center(child: Text('${t.t('erro_generico')}: $e', style: TextStyle(color: textColor))),
         data: (provas) {
           // Carrega feriados depois
           return asyncFeriados.when(
@@ -123,6 +125,8 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
 
   /// Constrói o conteúdo principal: Calendário + Lista de Eventos do Dia.
   Widget _buildCalendarContent(List<ProvaAgendada> provas, List<Feriado> feriados, Color textColor, Color calendarBg, Color cardColor, Color shadowColor) {
+    final t = AppLocalizations.of(context)!;
+    
     // Filtra eventos para o dia selecionado
     final eventosDoDia = [
       ...provas.where((p) => _isSameDay(p.dataHora, _selectedDay)),
@@ -147,6 +151,8 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
             focusedDay: _focusedDay,
             calendarFormat: _calendarFormat,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            // Define o locale do calendário de acordo com o AppLocalizations
+            locale: t.locale.toString(), 
             
             // Estilização
             headerStyle: HeaderStyle(
@@ -205,7 +211,8 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Eventos do Dia ${DateFormat('dd/MM').format(_selectedDay!)}",
+                  // TRADUZIDO: "Eventos do Dia 25/12"
+                  t.t('calendario_eventos_dia', args: [DateFormat('dd/MM').format(_selectedDay!)]),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
                 ),
                 const SizedBox(height: 16),
@@ -213,7 +220,8 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                 if (eventosDoDia.isEmpty)
                   Center(
                     child: Text(
-                      "Nada agendado para este dia.", 
+                      // TRADUZIDO: "Nada agendado para este dia."
+                      t.t('calendario_vazio_dia'), 
                       style: TextStyle(color: textColor.withOpacity(0.5))
                     )
                   )
@@ -241,7 +249,11 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text("Prova: ${evento.disciplina}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      // TRADUZIDO: "Prova: Matemática"
+                                      Text(
+                                        t.t('calendario_prova_prefixo', args: [evento.disciplina]), 
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                                      ),
                                       Text(evento.titulo, style: const TextStyle(color: Colors.white70)),
                                       Text(DateFormat('HH:mm').format(evento.dataHora), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                                     ],
@@ -268,7 +280,11 @@ class _TelaCalendarioState extends ConsumerState<TelaCalendario> {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text("Feriado", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      // TRADUZIDO: "Feriado"
+                                      Text(
+                                        t.t('calendario_feriado_label'), 
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+                                      ),
                                       Text(evento.nome, style: const TextStyle(color: Colors.white70)),
                                     ],
                                   ),

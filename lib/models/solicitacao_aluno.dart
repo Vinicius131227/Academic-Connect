@@ -1,4 +1,6 @@
 // lib/models/solicitacao_aluno.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum StatusSolicitacao { pendente, aprovada, recusada }
 
 class SolicitacaoAluno {
@@ -6,7 +8,7 @@ class SolicitacaoAluno {
   final String nomeAluno;
   final String ra;
   final String disciplina;
-  final String tipo; // "Adaptação", "Revisão"
+  final String tipo; 
   final DateTime data;
   final String descricao;
   final String? anexo;
@@ -38,7 +40,7 @@ class SolicitacaoAluno {
       'ra': ra,
       'disciplina': disciplina,
       'tipo': tipo,
-      'data': data.toIso8601String(),
+      'data': Timestamp.fromDate(data), // Salva sempre como Timestamp
       'descricao': descricao,
       'anexo': anexo,
       'status': status.name,
@@ -50,13 +52,22 @@ class SolicitacaoAluno {
   }
 
   factory SolicitacaoAluno.fromMap(Map<String, dynamic> map, String id) {
+    // --- CORREÇÃO DE DATA ---
+    DateTime dataObj = DateTime.now();
+    if (map['data'] is Timestamp) {
+      dataObj = (map['data'] as Timestamp).toDate();
+    } else if (map['data'] is String) {
+      dataObj = DateTime.tryParse(map['data']) ?? DateTime.now();
+    }
+    // ------------------------
+
     return SolicitacaoAluno(
       id: id,
       nomeAluno: map['nomeAluno'] ?? '',
       ra: map['ra'] ?? '',
       disciplina: map['disciplina'] ?? '',
       tipo: map['tipo'] ?? '',
-      data: DateTime.parse(map['data']),
+      data: dataObj,
       descricao: map['descricao'] ?? '',
       anexo: map['anexo'],
       status: StatusSolicitacao.values.firstWhere(

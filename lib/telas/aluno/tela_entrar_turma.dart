@@ -8,8 +8,8 @@ import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 // Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../services/servico_firestore.dart';
-import '../../l10n/app_localizations.dart'; // Traduções
-import '../comum/overlay_carregamento.dart'; // Loading global
+import '../../l10n/app_localizations.dart'; // Certifique-se que o caminho está correto
+import '../comum/overlay_carregamento.dart'; 
 
 /// Caso de uso para o Widgetbook.
 @UseCase(
@@ -42,6 +42,8 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
 
   /// Tenta realizar a matrícula do aluno na turma.
   Future<void> _entrarNaTurma() async {
+    final t = AppLocalizations.of(context)!;
+
     // 1. Validação local
     if (!_formKey.currentState!.validate()) {
       return;
@@ -51,14 +53,13 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
     final alunoUid = ref.read(provedorNotificadorAutenticacao).usuario?.uid;
     if (alunoUid == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erro: Aluno não autenticado.'), backgroundColor: Colors.red),
+        SnackBar(content: Text(t.t('erro_generico')), backgroundColor: Colors.red),
       );
       return;
     }
 
     // 3. Inicia carregamento
     ref.read(provedorCarregando.notifier).state = true;
-    final t = AppLocalizations.of(context)!;
     
     try {
       final codigo = _codeController.text.trim().toUpperCase();
@@ -80,6 +81,7 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
         ref.read(provedorCarregando.notifier).state = false;
         
         // 6. Erro (Código inválido ou já inscrito)
+        // Removemos "Exception: " da mensagem para ficar mais limpo
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceAll("Exception: ", "")), backgroundColor: Colors.red),
         );
@@ -89,14 +91,16 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
 
   @override
   Widget build(BuildContext context) {
+    // Instancia o tradutor
     final t = AppLocalizations.of(context)!;
+    
     final estaCarregando = ref.watch(provedorCarregando);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.t('entrar_turma_titulo')), // "Entrar na Turma"
+        title: Text(t.t('entrar_turma_titulo')), 
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -105,9 +109,9 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Texto de instrução
+              // Texto de instrução CORRIGIDO
               Text(
-                "Digite o código de 6 caracteres fornecido pelo professor.",
+                t.t('entrar_turma_instrucao'),
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
               ),
               const SizedBox(height: 24),
@@ -119,10 +123,10 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
                 // Força teclado em maiúsculas
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
-                  labelText: t.t('entrar_turma_label'), // "Código da Turma"
-                  hintText: t.t('entrar_turma_hint'),   // "Insira o código..."
+                  labelText: t.t('entrar_turma_label'), 
+                  hintText: t.t('entrar_turma_hint'),   
                   border: const OutlineInputBorder(),
-                  counterText: "", // Esconde contador "0/6"
+                  counterText: "", 
                   prefixIcon: const Icon(Icons.vpn_key),
                 ),
                 // Filtra para aceitar apenas letras e números
@@ -130,8 +134,8 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
                   FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
                 ],
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Campo obrigatório';
-                  if (v.length != 6) return 'O código deve ter exatos 6 caracteres';
+                  if (v == null || v.isEmpty) return 'Campo obrigatório'; // Poderia criar chave 'campo_obrigatorio'
+                  if (v.length != 6) return 'O código deve ter 6 caracteres'; // Poderia criar chave 'erro_codigo_tamanho'
                   return null;
                 },
                 maxLength: 6,
@@ -145,11 +149,10 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
                 icon: estaCarregando 
                   ? Container(width: 20, height: 20, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.login),
-                label: Text(estaCarregando ? 'Verificando...' : t.t('entrar_turma_botao')), 
+                label: Text(estaCarregando ? t.t('carregando') : t.t('entrar_turma_botao')), 
                 onPressed: estaCarregando ? null : _entrarNaTurma,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  // Usa a cor primária do tema
                   backgroundColor: theme.primaryColor,
                   foregroundColor: Colors.white,
                 ),

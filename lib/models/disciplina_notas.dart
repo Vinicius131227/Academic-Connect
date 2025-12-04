@@ -1,14 +1,15 @@
 // lib/models/disciplina_notas.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'prova_agendada.dart'; // Importante
+import 'package:intl/intl.dart'; // Para formatar data se necessário
+import 'prova_agendada.dart';
 
 enum StatusDisciplina { aprovado, reprovado, emCurso }
 
 class AvaliacaoNota {
   final String nome;
   final double? nota;
-  final double peso; // Adicionado
-  final String data; // Adicionado (string formatada)
+  final double peso;
+  final String data;
 
   AvaliacaoNota({
     required this.nome, 
@@ -21,11 +22,11 @@ class AvaliacaoNota {
 class DisciplinaNotas {
   final String id;
   final String turmaId;
-  final String nome;
-  final String codigo;
-  final String professor;
-  final double media;
-  final StatusDisciplina status;
+  final String nome; 
+  final String codigo; 
+  final String professor; 
+  final double media; 
+  final StatusDisciplina status; 
   final List<AvaliacaoNota> avaliacoes;
   final ProvaAgendada? proximaProva;
 
@@ -54,14 +55,23 @@ class DisciplinaNotas {
         orElse: () => StatusDisciplina.emCurso
       ),
       avaliacoes: [
+        // --- CORREÇÃO AQUI ---
         AvaliacaoNota(
           nome: map['avaliacaoNome'] ?? 'Avaliação',
           nota: (map['nota'] as num?)?.toDouble(),
-          data: map['dataLancamento'] != null 
-              ? (map['dataLancamento'] as Timestamp).toDate().toString() 
-              : '',
+          data: _parseData(map['dataLancamento']), 
         )
       ],
     );
+  }
+
+  // Função auxiliar para converter qualquer coisa em String de Data legível
+  static String _parseData(dynamic valor) {
+    if (valor == null) return '';
+    if (valor is Timestamp) {
+      return DateFormat('dd/MM').format(valor.toDate());
+    }
+    if (valor is String) return valor;
+    return '';
   }
 }

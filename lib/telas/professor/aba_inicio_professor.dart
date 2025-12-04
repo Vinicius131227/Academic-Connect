@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart'; // Para datas
+import 'package:intl/intl.dart'; 
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
 // Importações internas
@@ -11,16 +11,15 @@ import '../../models/turma_professor.dart';
 import '../../l10n/app_localizations.dart'; // Traduções
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart';
-import '../comum/widget_carregamento.dart'; // Loading
-import '../../themes/app_theme.dart'; // Cores
-import '../comum/animacao_fadein_lista.dart'; // Animação de entrada
+import '../comum/widget_carregamento.dart'; 
+import '../../themes/app_theme.dart'; 
+import '../comum/animacao_fadein_lista.dart'; 
 
 // Telas de navegação
 import 'tela_criar_turma.dart';
-import 'tela_detalhes_disciplina_prof.dart'; // Hub da disciplina
+import 'tela_detalhes_disciplina_prof.dart'; 
 
 /// Caso de uso para o Widgetbook.
-/// Simula a tela inicial do professor.
 @UseCase(
   name: 'Home Professor',
   type: AbaInicioProfessor,
@@ -28,17 +27,12 @@ import 'tela_detalhes_disciplina_prof.dart'; // Hub da disciplina
 Widget buildAbaInicioProfessor(BuildContext context) {
   return ProviderScope(
     child: AbaInicioProfessor(
-      onNavigateToTab: (index) {}, // Mock da navegação
+      onNavigateToTab: (index) {}, 
     ),
   );
 }
 
 /// Aba Inicial do Professor (Dashboard).
-///
-/// Funcionalidades:
-/// 1. Exibe saudação e resumo estatístico (Total de turmas/alunos).
-/// 2. Acesso rápido para Criar Turma, Ver Histórico, etc.
-/// 3. Lista automática das aulas agendadas para o dia atual ("Hoje").
 class AbaInicioProfessor extends ConsumerWidget {
   /// Callback para navegar entre as abas da `TelaPrincipalProfessor` (0, 1, 2).
   final ValueSetter<int> onNavigateToTab;
@@ -112,15 +106,6 @@ class AbaInicioProfessor extends ConsumerWidget {
             ],
           ),
           // Ícone decorativo
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: cardBgColor, 
-              shape: BoxShape.circle,
-              border: Border.all(color: borderColor)
-            ),
-            child: Icon(Icons.school, color: textColor),
-          ),
         ],
       ),
 
@@ -215,18 +200,7 @@ class AbaInicioProfessor extends ConsumerWidget {
             textColor: subTextColor, 
             onTap: () => onNavigateToTab(1)
           )), 
-          const SizedBox(width: 8),
-          
-          // Botão Perfil (Navega para Tab 2)
-          Expanded(child: _buildCategoryItem(
-            context, 
-            icon: Icons.person, 
-            label: t.t('perfil_titulo'), 
-            color: const Color(0xFFF3E5F5), 
-            iconColor: Colors.purple, 
-            textColor: subTextColor, 
-            onTap: () => onNavigateToTab(2)
-          )), 
+          // BOTÃO PERFIL REMOVIDO AQUI
         ],
       ),
 
@@ -349,9 +323,11 @@ class AbaInicioProfessor extends ConsumerWidget {
        // Formato esperado: "Seg 08:00-10:00"
        hora = turma.horario.split(' ')[1].split('-')[0];
     } catch (e) {
-       hora = "Hoje";
+       hora = "00:00";
     }
     
+    final t = AppLocalizations.of(context)!;
+
     return GestureDetector(
       onTap: () {
          // Abre o Hub da Disciplina
@@ -378,7 +354,8 @@ class AbaInicioProfessor extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(hora, style: GoogleFonts.poppins(color: AppColors.primaryPurple, fontWeight: FontWeight.bold, fontSize: 18)),
-                Text("Início", style: GoogleFonts.poppins(color: subTextColor, fontSize: 10)),
+                // USANDO CHAVE 'prof_chamada_tipo_inicio' (Início) ou texto fixo se preferir
+                Text(t.t('prof_chamada_tipo_inicio'), style: GoogleFonts.poppins(color: subTextColor, fontSize: 10)),
               ],
             ),
             const SizedBox(width: 16),

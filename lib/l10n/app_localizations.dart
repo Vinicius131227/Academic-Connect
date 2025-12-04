@@ -17,46 +17,53 @@ class AppLocalizations {
     Locale('es', ''), // Espanhol
   ];
   
-  // --- LISTAS ESTÁTICAS (Dropdowns) ---
-  static const List<String> universidades = [
+  // --- LISTAS DINÂMICAS (Getters) ---
+  
+  List<String> get universidades => [
     'UFSCar - Campus Sorocaba'
   ];
   
-  static const List<String> cursos = [
-    'Administração',
-    'Ciências Biológicas',
-    'Ciência da Computação',
-    'Ciências Econômicas',
-    'Engenharia de Produção',
-    'Engenharia Florestal',
-    'Física',
-    'Geografia',
-    'Matemática',
-    'Pedagogia',
-    'Química',
-    'Turismo'
-  ];
+  List<String> get cursos {
+    if (locale.languageCode == 'en') {
+      return [
+        'Business Administration', 'Biological Sciences', 'Computer Science',
+        'Economics', 'Production Engineering', 'Forest Engineering',
+        'Physics', 'Geography', 'Mathematics', 'Pedagogy', 'Chemistry', 'Tourism'
+      ];
+    } else if (locale.languageCode == 'es') {
+      return [
+        'Administración', 'Ciencias Biológicas', 'Ciencias de la Computación',
+        'Ciencias Económicas', 'Ingeniería de Producción', 'Ingeniería Forestal',
+        'Física', 'Geografía', 'Matemáticas', 'Pedagogía', 'Química', 'Turismo'
+      ];
+    }
+    // Padrão PT
+    return [
+      'Administração', 'Ciências Biológicas', 'Ciência da Computação',
+      'Ciências Econômicas', 'Engenharia de Produção', 'Engenharia Florestal',
+      'Física', 'Geografia', 'Matemática', 'Pedagogia', 'Química', 'Turismo'
+    ];
+  }
   
-  static const List<String> predios = [
-    'ATLab', 
-    'AT2', 
-    'CCHB', 
-    'CCTS',
-    'CCGT',
-    'FINEP 1',
-    'FINEP 2',
-  ];
+  List<String> get predios {
+    return [
+      'ATLab', 'AT2', 'CCHB', 'CCTS', 'CCGT', 'FINEP 1', 'FINEP 2',
+    ];
+  }
   
-  static const List<String> identificacaoProfessor = [
-    'Matrícula SIAPE',
-    'Registro Docente',
-    'ID Externo'
-  ];
+  List<String> get identificacaoProfessor {
+    if (locale.languageCode == 'en') {
+        return ['SIAPE ID', 'Teacher Registry', 'External ID'];
+    } else if (locale.languageCode == 'es') {
+        return ['Matrícula SIAPE', 'Registro Docente', 'ID Externo'];
+    }
+    return ['Matrícula SIAPE', 'Registro Docente', 'ID Externo'];
+  }
   
   // --- DICIONÁRIO GLOBAL DE TRADUÇÕES ---
   static final Map<String, Map<String, String>> _valores = {
     // =========================================================================
-    // PORTUGUÊS
+    // PORTUGUÊS (PT)
     // =========================================================================
     'pt': {
       // GERAL
@@ -70,6 +77,7 @@ class AppLocalizations {
       'sucesso': 'Sucesso!',
       'atencao': 'Atenção',
       'ok': 'OK',
+      'campo_obrigatorio': 'Obrigatório',
 
       // LOGIN
       'login_titulo': 'Login',
@@ -81,6 +89,7 @@ class AppLocalizations {
       'login_ou_continue': 'Ou continue com',
       'login_nao_tem_conta': 'Não tem uma conta?',
       'login_cadastre_se': 'Cadastre-se',
+      'login_google_btn': 'Entrar com Google',
       'login_bemvindo_arte': 'Bem-vindo ao\nPortal do Aluno',
       'login_acesso_arte': 'Faça login para acessar sua conta',
 
@@ -103,6 +112,8 @@ class AppLocalizations {
       'cadastro_entrar_link': 'Entrar',
       'cadastro_confirmar_senha': 'Confirmar Senha',
       'cadastro_erro_senha': 'As senhas não coincidem',
+      'erro_data_nascimento': 'Data de nascimento obrigatória',
+      'dica_senha_curta': 'Mínimo 6 caracteres',
 
       // ESQUECEU SENHA
       'esqueceu_titulo': 'Esqueceu a Senha?',
@@ -152,6 +163,7 @@ class AppLocalizations {
       'aluno_perfil_cr': 'CR',
       'aluno_perfil_carregando': 'Carregando perfil...',
       'aluno_perfil_edit_sucesso': 'Perfil atualizado!',
+      'aluno_perfil_salvar': 'Salvar Perfil',
 
       // NAVEGAÇÃO
       'nav_inicio': 'Início',
@@ -190,7 +202,12 @@ class AppLocalizations {
       'aluno_disciplinas_frequencia': 'Frequência',
       'aluno_disciplinas_ver_notas': 'Notas',
       'aluno_disciplinas_acessar_materia': 'Acessar Sala',
+      'aluno_disciplinas_vazio': 'Você ainda não tem disciplinas.',
+      'aluno_disciplinas_entrar': 'Entrar em uma Turma',
+      
+      // ENTRAR TURMA
       'entrar_turma_titulo': 'Entrar na Turma',
+      'entrar_turma_instrucao': 'Digite o código de 6 caracteres fornecido pelo professor.',
       'entrar_turma_label': 'Código da Turma',
       'entrar_turma_hint': 'Insira o código de 6 dígitos',
       'entrar_turma_botao': 'Entrar',
@@ -214,11 +231,21 @@ class AppLocalizations {
       'materiais_videos': 'Vídeo Aulas',
       'chat_placeholder': 'Digite uma mensagem...',
       'chat_vazio': 'Nenhuma mensagem ainda.',
+      'chat_titulo_sala': 'Chat: {}',
+      'detalhes_sem_notas': 'Nenhuma nota lançada.',
+      'detalhes_sem_provas': 'Nenhuma prova agendada.',
+
+      // CALENDÁRIO
+      'calendario_titulo_screen': 'Calendário Acadêmico',
+      'calendario_eventos_dia': 'Eventos do Dia {}',
+      'calendario_vazio_dia': 'Nada agendado para este dia.',
+      'calendario_prova_prefixo': 'Prova: {}',
+      'calendario_feriado_label': 'Feriado',
 
       // --- ABA INICIAL PROFESSOR ---
       'prof_titulo': 'Portal do Professor',
       'prof_bemvindo': 'Bem-vindo(a)',
-      'prof_resumo': 'Gerencie suas turmas',
+      'prof_resumo': 'Gerencie suas turmas e aulas.',
       'prof_aulas_hoje': 'Aulas de Hoje',
       'prof_sem_aulas': 'Nenhuma aula programada para hoje.',
       'prof_turmas_titulo': 'Minhas Turmas',
@@ -291,22 +318,76 @@ class AppLocalizations {
       'prof_chamada_tipo_desc': 'Esta é a primeira chamada (início) ou a segunda (fim)?',
       'prof_chamada_tipo_inicio': 'Início',
       'prof_chamada_tipo_fim': 'Fim',
+      'prof_card_inicio': 'Início', 
+      'prof_historico_vazio': 'Nenhuma chamada registrada.',
+      'prof_total_inscritos': 'Total inscritos na turma: {}',
 
-      // CRIAR TURMA
+      // CRIAR/EDITAR TURMA
       'criar_turma_titulo': 'Criar Nova Turma',
       'criar_turma_nome': 'Nome da Disciplina *',
       'criar_turma_nome_hint': 'Ex: Desenvolvimento Mobile',
       'criar_turma_horario': 'Horários e Dias *',
       'criar_turma_horario_hint': 'Ex: Seg 14:00-16:00',
-      'criar_turma_local': 'Local (Prédio e Sala) *',
-      'criar_turma_local_hint': 'Ex: AT1 - Sala 105',
+      'criar_turma_local': 'Prédio *',
+      'criar_turma_sala': 'Sala',
+      'criar_turma_local_hint': 'Ex: 105',
       'criar_turma_botao': 'Criar Turma',
       'criar_turma_sucesso': 'Turma Criada!',
       'criar_turma_codigo_desc': 'Compartilhe este código:',
       'criar_turma_ok': 'OK',
+      'criar_turma_dados_basicos': 'Dados Básicos',
+      'criar_turma_creditos': 'Créditos',
+      'criar_turma_creditos_item': '{} Créditos',
+      'criar_turma_localizacao_titulo': 'Localização',
+      'criar_turma_hint_horario': 'Clique no + para adicionar horários',
+      'prof_editar_turma': 'Editar Turma',
+      'prof_editar_salvar': 'Salvar Alterações',
+      'prof_turma_atualizada': 'Turma atualizada com sucesso!',
+      'erro_atualizar': 'Erro ao atualizar: {}',
       'chamada_aviso_passado': 'Chamada retroativa.',
       'chamada_aviso_futuro': 'Chamada futura não permitida.',
       'chamada_aviso_creditos': 'Atenção aos créditos.',
+      'erro_max_dias': 'Máximo: 2 dias/aula',
+      'erro_horario_comercial': 'Horário permitido: 08:00 - 18:00',
+      'erro_almoco': 'Horário de almoço (12h-14h) bloqueado.',
+      'erro_fim_inicio': 'Hora Fim deve ser maior que Início',
+      'erro_creditos_tempo_2': '2 Créditos = Máximo 2h de aula',
+      'erro_max_tempo': 'Máximo 4h de duração',
+      'erro_preencher_tudo': 'Preencha todos os campos.',
+      'erro_sem_horario': 'Adicione pelo menos um horário.',
+      'erro_obrigatorio': 'Obrigatório',
+
+      // MARCAR PROVA
+      'marcar_prova_titulo_screen': 'Marcar Prova - {}',
+      'marcar_prova_titulo_label': 'Título da Avaliação *',
+      'marcar_prova_titulo_hint': 'Ex: P1 - Prova N1',
+      'marcar_prova_selecionar_data': 'Selecionar Data *',
+      'marcar_prova_selecionar_hora': 'Selecionar Hora *',
+      'marcar_prova_predio': 'Prédio *',
+      'marcar_prova_sala': 'Sala *',
+      'marcar_prova_sala_hint': 'Ex: 105 ou Lab 3',
+      'marcar_prova_conteudo': 'Conteúdo Abordado *',
+      'marcar_prova_conteudo_hint': 'Ex: Capítulos 1-3',
+      'marcar_prova_salvar_btn': 'Salvar Prova',
+      'marcar_prova_salvando': 'Salvando...',
+      'marcar_prova_sucesso': 'Prova marcada com sucesso!',
+      'erro_preencher_tudo_prova': 'Preencha todos os campos (Data, Hora, Prédio).',
+
+      // MATERIAIS PROFESSOR
+      'materiais_ajuda_add': 'Clique no + para adicionar conteúdo.',
+      'materiais_removido': 'Material removido.',
+      'materiais_add_titulo': 'Adicionar Material',
+      'materiais_add_titulo_label': 'Título',
+      'materiais_add_desc': 'Descrição',
+      'materiais_add_url': 'Link (URL)',
+      'materiais_add_tipo': 'Tipo',
+      'materiais_add_salvar': 'Salvar Material',
+      'materiais_add_sucesso': 'Material salvo com sucesso!',
+      'materiais_tipo_link': 'Link',
+      'materiais_tipo_video': 'Vídeo',
+      'materiais_tipo_prova': 'Prova Antiga',
+      'materiais_tipo_outro': 'Outro',
+      'materiais_erro_link': 'Insira um link válido (ex: https://...)',
 
       // ABA INÍCIO (CA)
       'ca_titulo': 'Portal C.A.',
@@ -394,6 +475,17 @@ class AppLocalizations {
     // =========================================================================
     'en': {
       'app_nome': 'Academic Connect',
+      'erro_generico': 'An error occurred',
+      'carregando': 'Loading...',
+      'salvar': 'Save',
+      'cancelar': 'Cancel',
+      'voltar': 'Back',
+      'fechar': 'Close',
+      'sucesso': 'Success!',
+      'atencao': 'Attention',
+      'ok': 'OK',
+      'campo_obrigatorio': 'Required',
+
       'login_titulo': 'Login',
       'login_subtitulo': 'Enter your account details',
       'login_email': 'Email',
@@ -403,7 +495,10 @@ class AppLocalizations {
       'login_ou_continue': 'Or continue with',
       'login_nao_tem_conta': "Don't have an account?",
       'login_cadastre_se': 'Sign Up',
+      'login_google_btn': 'Sign up with Google',
       'login_bemvindo_arte': 'Welcome to\nStudent Portal',
+      'login_acesso_arte': 'Login to access your account',
+
       'cadastro_titulo': 'Create Account',
       'cadastro_subtitulo': 'Fill in your details to start',
       'cadastro_universidade': 'University *',
@@ -418,14 +513,21 @@ class AppLocalizations {
       'cadastro_carregando': 'Registering...',
       'cadastro_finalizar': 'Finish Registration',
       'cadastro_sucesso': 'Registration successful!',
+      'cadastro_confirmar_senha': 'Confirm Password',
+      'cadastro_erro_senha': 'Passwords do not match',
+      'erro_data_nascimento': 'Birth date required',
+      'dica_senha_curta': 'Min 6 chars',
+
       'esqueceu_titulo': 'Forgot Password?',
       'esqueceu_subtitulo': 'Enter your email to receive a recovery link.',
       'esqueceu_enviar': 'Send Link',
       'esqueceu_voltar_login': 'Remember password?',
       'esqueceu_login_link': 'Login',
-      'papel_aluno': 'Student',
-      'papel_professor': 'Professor',
+
+      'papel_aluno': 'I am a Student',
+      'papel_professor': 'I am a Professor',
       'papel_ca': 'Academic Center',
+
       'config_titulo': 'Settings',
       'config_secao_aparencia': 'APPEARANCE',
       'config_secao_idioma': 'LANGUAGE',
@@ -446,26 +548,28 @@ class AppLocalizations {
       'config_sair_dialog_cancelar': 'Cancel',
       'config_sobre': 'About',
       'config_versao': 'Version',
-      'alterar_senha_titulo': 'Change Password',
-      'alterar_senha_aviso': 'Security check required.',
-      'alterar_senha_aviso_email': 'Email sent.',
-      'alterar_senha_atual': 'Current Password',
-      'alterar_senha_nova': 'New Password',
-      'alterar_senha_confirmar': 'Confirm Password',
-      'alterar_senha_botao': 'Save',
-      'alterar_senha_dicas': 'Tips',
+
       'perfil_titulo': 'Profile',
       'perfil_editar_btn': 'Edit Profile',
       'perfil_info_academica': 'ACADEMIC INFO',
       'perfil_info_profissional': 'PROFESSIONAL INFO',
       'perfil_sugestao_btn': 'Send Feedback',
       'perfil_subtitulo_sugestao': 'Help us improve.',
+      'editar_perfil_titulo': 'Edit Profile',
+      'editar_perfil_aviso': 'Update data.',
+      'aluno_perfil_status': 'Status',
+      'aluno_perfil_cr': 'GPA',
+      'aluno_perfil_carregando': 'Loading...',
+      'aluno_perfil_edit_sucesso': 'Profile updated!',
+      'aluno_perfil_salvar': 'Save Profile',
+
       'nav_inicio': 'Home',
       'nav_disciplinas': 'Classes',
       'nav_perfil': 'Profile',
       'nav_turmas': 'Classes',
       'nav_solicitacoes': 'Requests',
       'nav_eventos': 'Events',
+
       'aluno_inicio_titulo': 'Home',
       'aluno_inicio_bemvindo': 'Welcome',
       'aluno_inicio_resumo': 'Academic Summary',
@@ -476,15 +580,6 @@ class AppLocalizations {
       'inicio_proximas_avaliacoes': 'Upcoming Exams',
       'inicio_btn_sincronizar': 'Sync Data',
       'inicio_sem_provas': 'No exams scheduled.',
-      'aluno_inicio_freq_media': 'Attendance Avg',
-      'aluno_inicio_freq_geral': 'General Attendance',
-      'aluno_inicio_freq_acima': 'Good attendance',
-      'aluno_inicio_freq_abaixo': 'Low attendance',
-      'aluno_inicio_ver_detalhes': 'Details',
-      'aluno_inicio_provas': 'Exams',
-      'aluno_inicio_notas': 'Grades',
-      'aluno_inicio_adaptacoes': 'Adaptations',
-      'aluno_inicio_cadastrar_nfc': 'Register NFC',
       'card_frequencia': 'Attendance',
       'card_notas': 'Grades',
       'card_adaptacao': 'Adaptation',
@@ -494,6 +589,7 @@ class AppLocalizations {
       'card_calendario': 'Calendar',
       'status_cr': 'GPA',
       'status_ativo': 'Active',
+
       'aluno_disciplinas_titulo': 'My Classes',
       'aluno_disciplinas_aviso': 'Min attendance: 75%.',
       'aluno_disciplinas_faltas': 'absences',
@@ -501,11 +597,16 @@ class AppLocalizations {
       'aluno_disciplinas_frequencia': 'Attendance',
       'aluno_disciplinas_ver_notas': 'Grades',
       'aluno_disciplinas_acessar_materia': 'Enter Class',
+      'aluno_disciplinas_vazio': 'No classes yet.',
+      'aluno_disciplinas_entrar': 'Join a Class',
+
       'entrar_turma_titulo': 'Join Class',
+      'entrar_turma_instrucao': 'Enter the 6-character code provided by the professor.',
       'entrar_turma_label': 'Class Code',
       'entrar_turma_hint': 'Enter code',
       'entrar_turma_botao': 'Join',
       'entrar_turma_sucesso': 'Joined!',
+
       'hub_chat': 'Chat',
       'hub_materiais': 'Materials',
       'hub_dicas': 'Tips',
@@ -523,11 +624,21 @@ class AppLocalizations {
       'materiais_videos': 'Videos',
       'chat_placeholder': 'Type a message...',
       'chat_vazio': 'No messages.',
+      'detalhes_sem_notas': 'No grades released.',
+      'detalhes_sem_provas': 'No exams scheduled.',
+      'chat_titulo_sala': 'Chat: {}',
+
+      'calendario_titulo_screen': 'Academic Calendar',
+      'calendario_eventos_dia': 'Events for {}',
+      'calendario_vazio_dia': 'Nothing scheduled for this day.',
+      'calendario_prova_prefixo': 'Exam: {}',
+      'calendario_feriado_label': 'Holiday',
+
       'prof_titulo': 'Professor Portal',
       'prof_bemvindo': 'Welcome',
       'prof_resumo': 'Manage classes',
       'prof_aulas_hoje': "Today's Classes",
-      'prof_sem_aulas': 'No classes today.',
+      'prof_sem_aulas': 'No classes scheduled for today.',
       'prof_turmas_titulo': 'My Classes',
       'prof_gestao': 'Management',
       'prof_presenca': 'Attendance',
@@ -598,21 +709,75 @@ class AppLocalizations {
       'prof_chamada_tipo_desc': 'Start or End?',
       'prof_chamada_tipo_inicio': 'Start',
       'prof_chamada_tipo_fim': 'End',
+      'prof_card_inicio': 'Start',
+      'prof_historico_vazio': 'No attendance records found.',
+      'prof_total_inscritos': 'Total enrolled students: {}',
+
       'criar_turma_titulo': 'Create Class',
       'criar_turma_nome': 'Name *',
       'criar_turma_nome_hint': 'Ex: Math',
       'criar_turma_horario': 'Schedule *',
       'criar_turma_horario_hint': 'Ex: Mon 14:00',
-      'criar_turma_local': 'Location *',
-      'criar_turma_local_hint': 'Ex: Room 1',
+      'criar_turma_local': 'Building *',
+      'criar_turma_sala': 'Room',
+      'criar_turma_local_hint': 'Ex: 105',
       'criar_turma_botao': 'Create',
       'criar_turma_sucesso': 'Created!',
       'criar_turma_codigo_desc': 'Code:',
       'criar_turma_ok': 'OK',
+      'criar_turma_dados_basicos': 'Basic Info',
+      'criar_turma_creditos': 'Credits',
+      'criar_turma_creditos_item': '{} Credits',
+      'criar_turma_localizacao_titulo': 'Location',
+      'criar_turma_hint_horario': 'Click + to add schedules',
+      'prof_editar_turma': 'Edit Class',
+      'prof_editar_salvar': 'Save Changes',
+      'prof_turma_atualizada': 'Class updated successfully!',
+      'erro_atualizar': 'Error updating: {}',
       'chamada_aviso_passado': 'Retroactive.',
       'chamada_aviso_futuro': 'Future not allowed.',
       'chamada_aviso_creditos': 'Credit warning.',
       'chamada_aviso_duas_chamadas': 'Already called.',
+      'erro_max_dias': 'Max: 2 days/class',
+      'erro_horario_comercial': 'Allowed hours: 08:00 - 18:00',
+      'erro_almoco': 'Lunch time (12-14h) blocked.',
+      'erro_fim_inicio': 'End time must be after Start time',
+      'erro_creditos_tempo_2': '2 Credits = Max 2h duration',
+      'erro_max_tempo': 'Max 4h duration',
+      'erro_preencher_tudo': 'Fill in all fields.',
+      'erro_sem_horario': 'Add at least one schedule.',
+      'erro_obrigatorio': 'Required',
+
+      'marcar_prova_titulo_screen': 'Schedule Exam - {}',
+      'marcar_prova_titulo_label': 'Assessment Title *',
+      'marcar_prova_titulo_hint': 'Ex: Midterm Exam',
+      'marcar_prova_selecionar_data': 'Select Date *',
+      'marcar_prova_selecionar_hora': 'Select Time *',
+      'marcar_prova_predio': 'Building *',
+      'marcar_prova_sala': 'Room *',
+      'marcar_prova_sala_hint': 'Ex: 105 or Lab 3',
+      'marcar_prova_conteudo': 'Content Covered *',
+      'marcar_prova_conteudo_hint': 'Ex: Chapters 1-3',
+      'marcar_prova_salvar_btn': 'Save Exam',
+      'marcar_prova_salvando': 'Saving...',
+      'marcar_prova_sucesso': 'Exam scheduled successfully!',
+      'erro_preencher_tudo_prova': 'Fill in all fields (Date, Time, Building).',
+
+      'materiais_ajuda_add': 'Click + to add content.',
+      'materiais_removido': 'Material removed.',
+      'materiais_add_titulo': 'Add Material',
+      'materiais_add_titulo_label': 'Title',
+      'materiais_add_desc': 'Description',
+      'materiais_add_url': 'Link (URL)',
+      'materiais_add_tipo': 'Type',
+      'materiais_add_salvar': 'Save Material',
+      'materiais_add_sucesso': 'Material saved successfully!',
+      'materiais_tipo_link': 'Link',
+      'materiais_tipo_video': 'Video',
+      'materiais_tipo_prova': 'Old Exam',
+      'materiais_tipo_outro': 'Other',
+      'materiais_erro_link': 'Enter a valid link (e.g. https://...)',
+
       'ca_titulo': 'C.A. Portal',
       'ca_subtitulo': 'Events',
       'ca_eventos_ativos': 'Active',
@@ -652,18 +817,11 @@ class AppLocalizations {
       'ca_presenca_salva_sucesso': 'Saved!',
       'ca_presenca_nfc_lendo_titulo': 'Scanning...',
       'ca_presenca_nfc_lendo_desc': 'Tap cards',
-      'aluno_perfil_status': 'Status',
       'aluno_perfil_status_label': 'Status',
-      'aluno_perfil_cr': 'GPA',
       'aluno_perfil_artigos': 'Tips',
-      'aluno_perfil_carregando': 'Loading...',
       'aluno_perfil_nome_completo': 'Name',
       'aluno_perfil_ra': 'ID',
       'aluno_perfil_curso': 'Course',
-      'aluno_perfil_salvar': 'Save',
-      'aluno_perfil_edit_sucesso': 'Updated!',
-      'editar_perfil_titulo': 'Edit Profile',
-      'editar_perfil_aviso': 'Update data.',
       'nfc_cadastro_titulo': 'Register NFC',
       'nfc_cadastro_aguardando': 'Scanning...',
       'nfc_cadastro_instrucao': 'Tap card.',
@@ -709,9 +867,22 @@ class AppLocalizations {
       'erro_generico': 'Error.',
     },
     
-    // --- ESPANHOL ---
+    // =========================================================================
+    // ESPANHOL (ES)
+    // =========================================================================
     'es': {
       'app_nome': 'Academic Connect',
+      'erro_generico': 'Ocurrió un error',
+      'carregando': 'Cargando...',
+      'salvar': 'Guardar',
+      'cancelar': 'Cancelar',
+      'voltar': 'Volver',
+      'fechar': 'Cerrar',
+      'sucesso': '¡Éxito!',
+      'atencao': 'Atención',
+      'ok': 'OK',
+      'campo_obrigatorio': 'Requerido',
+
       'login_titulo': 'Acceso',
       'login_subtitulo': 'Ingresa tus datos',
       'login_email': 'Correo',
@@ -721,8 +892,10 @@ class AppLocalizations {
       'login_ou_continue': 'O continuar con',
       'login_nao_tem_conta': '¿No tienes cuenta?',
       'login_cadastre_se': 'Regístrate',
+      'login_google_btn': 'Registrarse con Google',
       'login_bemvindo_arte': 'Bienvenido al\nPortal',
       'login_acesso_arte': 'Inicia sesión para acceder',
+
       'cadastro_titulo': 'Crear Cuenta',
       'cadastro_subtitulo': 'Completa tus datos',
       'cadastro_universidade': 'Universidad *',
@@ -741,15 +914,20 @@ class AppLocalizations {
       'cadastro_entrar_link': 'Entrar',
       'cadastro_confirmar_senha': 'Confirmar Contraseña',
       'cadastro_erro_senha': 'Las contraseñas no coinciden',
+      'erro_data_nascimento': 'Fecha de nacimiento obligatoria',
+      'dica_senha_curta': 'Mínimo 6 caracteres',
+
       'esqueceu_titulo': '¿Recuperar?',
       'esqueceu_subtitulo': 'Ingresa tu correo',
       'esqueceu_enviar': 'Enviar',
       'esqueceu_voltar_login': 'Volver',
       'esqueceu_login_link': 'Entrar',
-      'papel_aluno': 'Estudiante',
-      'papel_professor': 'Profesor',
+
+      'papel_aluno': 'Soy Estudiante',
+      'papel_professor': 'Soy Profesor',
       'papel_ca': 'Centro Académico',
       'papel_desconhecido': 'Desconocido',
+
       'config_titulo': 'Configuración',
       'config_secao_aparencia': 'APARIENCIA',
       'config_secao_idioma': 'IDIOMA',
@@ -769,18 +947,26 @@ class AppLocalizations {
       'config_sair_dialog_cancelar': 'Cancelar',
       'config_sobre': 'Acerca de',
       'config_versao': 'Versión',
+
       'perfil_titulo': 'Perfil',
       'perfil_editar_btn': 'Editar Perfil',
       'perfil_info_academica': 'INFO ACADÉMICA',
       'perfil_info_profissional': 'INFO PROFESIONAL',
       'perfil_sugestao_btn': 'Sugerencia',
       'perfil_subtitulo_sugestao': 'Ayuda a mejorar.',
+      'editar_perfil_titulo': 'Editar Perfil',
+      'editar_perfil_aviso': 'Actualiza datos.',
+      'aluno_perfil_status': 'Estado',
+      'aluno_perfil_edit_sucesso': '¡Perfil actualizado!',
+      'aluno_perfil_salvar': 'Guardar Perfil',
+
       'nav_inicio': 'Inicio',
       'nav_disciplinas': 'Clases',
       'nav_perfil': 'Perfil',
       'nav_turmas': 'Clases',
       'nav_solicitacoes': 'Solicitudes',
       'nav_eventos': 'Eventos',
+
       'aluno_inicio_titulo': 'Inicio',
       'aluno_inicio_bemvindo': 'Bienvenido',
       'aluno_inicio_resumo': 'Resumen',
@@ -809,6 +995,7 @@ class AppLocalizations {
       'card_calendario': 'Calendario',
       'status_cr': 'Promedio',
       'status_ativo': 'Activo',
+
       'aluno_disciplinas_titulo': 'Mis Clases',
       'aluno_disciplinas_aviso': 'Asistencia min: 75%.',
       'aluno_disciplinas_faltas': 'ausencias',
@@ -816,11 +1003,16 @@ class AppLocalizations {
       'aluno_disciplinas_frequencia': 'Asistencia',
       'aluno_disciplinas_ver_notas': 'Notas',
       'aluno_disciplinas_acessar_materia': 'Entrar',
+      'aluno_disciplinas_vazio': 'Aún no tienes clases.',
+      'aluno_disciplinas_entrar': 'Unirse a una Clase',
+
       'entrar_turma_titulo': 'Unirse',
+      'entrar_turma_instrucao': 'Ingrese el código de 6 caracteres proporcionado por el profesor.',
       'entrar_turma_label': 'Código',
       'entrar_turma_hint': 'Código',
       'entrar_turma_botao': 'Unirse',
       'entrar_turma_sucesso': '¡Unido!',
+
       'hub_chat': 'Chat',
       'hub_materiais': 'Materiales',
       'hub_dicas': 'Consejos',
@@ -838,6 +1030,16 @@ class AppLocalizations {
       'materiais_videos': 'Videos',
       'chat_placeholder': 'Escribe...',
       'chat_vazio': 'Sin mensajes.',
+      'detalhes_sem_notas': 'Ninguna nota publicada.',
+      'detalhes_sem_provas': 'Ningún examen programado.',
+      'chat_titulo_sala': 'Chat: {}',
+
+      'calendario_titulo_screen': 'Calendario Académico',
+      'calendario_eventos_dia': 'Eventos del Día {}',
+      'calendario_vazio_dia': 'Nada programado para este día.',
+      'calendario_prova_prefixo': 'Examen: {}',
+      'calendario_feriado_label': 'Feriado',
+
       'prof_titulo': 'Portal Profesor',
       'prof_bemvindo': 'Bienvenido',
       'prof_resumo': 'Gestión',
@@ -898,75 +1100,7 @@ class AppLocalizations {
       'prof_presenca_nfc_pausada_titulo': 'Pausado',
       'prof_presenca_nfc_pausada_desc': 'Iniciar',
       'prof_presenca_nfc_lendo_titulo': 'Leyendo...',
-      'prof_presenca_nfc_lendo_desc': 'Acerca tarjeta',
-      'prof_presenca_nfc_indisponivel_titulo': 'No NFC',
-      'prof_presenca_nfc_indisponivel_desc': 'No soportado',
-      'prof_presenca_nfc_erro_titulo': 'Error',
-      'prof_presenca_nfc_erro_desc': 'Reintentar',
-      'prof_presenca_nfc_pausar': 'Pausar',
-      'prof_presenca_nfc_iniciar': 'Iniciar',
-      'prof_presenca_nfc_finalizar': 'Fin',
-      'prof_presenca_nfc_registrados': 'Registrados',
-      'prof_presenca_nfc_vazio': 'Vacío',
-      'prof_presenca_nfc_presente': 'Presente',
-      'prof_chamada_tipo_titulo': 'Tipo',
-      'prof_chamada_tipo_desc': '¿Inicio/Fin?',
-      'prof_chamada_tipo_inicio': 'Inicio',
-      'prof_chamada_tipo_fim': 'Fin',
-      'criar_turma_titulo': 'Crear Clase',
-      'criar_turma_nome': 'Nombre *',
-      'criar_turma_nome_hint': 'Ej: Mat',
-      'criar_turma_horario': 'Horario *',
-      'criar_turma_horario_hint': 'Ej: Lun 14:00',
-      'criar_turma_local': 'Ubicación *',
-      'criar_turma_local_hint': 'Ej: 105',
-      'criar_turma_botao': 'Crear',
-      'criar_turma_sucesso': '¡Creada!',
-      'criar_turma_codigo_desc': 'Código:',
-      'criar_turma_ok': 'OK',
-      'chamada_aviso_passado': 'Retroactiva.',
-      'chamada_aviso_futuro': 'Futura no.',
-      'chamada_aviso_creditos': 'Créditos.',
-      'chamada_aviso_duas_chamadas': 'Ya hecha.',
-      'ca_titulo': 'Portal C.A.',
-      'ca_subtitulo': 'Eventos',
-      'ca_eventos_ativos': 'Activos',
-      'ca_participantes': 'Participantes',
-      'ca_acoes': 'Acciones',
-      'ca_criar_evento': 'Crear',
-      'ca_ler_presenca': 'Leer',
-      'ca_comunicado': 'Anuncio',
-      'ca_proximos_eventos': 'Calendario',
-      'ca_sem_eventos': 'Sin eventos.',
-      'ca_inicio_bemvindo': 'Bienvenido',
-      'ca_inicio_resumo': 'Gestión',
-      'ca_acao_presenca': 'Asistencia',
-      'ca_acao_presenca_desc': 'NFC',
-      'ca_links_uteis': 'Enlaces',
-      'ca_eventos_titulo': 'Eventos',
-      'ca_eventos_proximos': 'Próximos',
-      'ca_eventos_inscritos': 'inscritos',
-      'ca_eventos_iniciar_registro': 'Iniciar',
-      'ca_eventos_criar_titulo': 'Nuevo Evento',
-      'ca_eventos_criar_nome': 'Nombre *',
-      'ca_eventos_criar_data': 'Fecha *',
-      'ca_eventos_criar_local': 'Lugar *',
-      'ca_eventos_criar_participantes': 'Participantes',
-      'ca_eventos_criar_salvar': 'Guardar',
-      'ca_comunicado_titulo': 'Anuncio',
-      'ca_comunicado_para': 'A:',
-      'ca_comunicado_assunto': 'Asunto *',
-      'ca_comunicado_mensagem': 'Mensaje *',
-      'ca_comunicado_anexar': 'Adjuntar',
-      'ca_comunicado_enviar': 'Enviar',
-      'ca_titulo_inicio': 'Inicio',
-      'ca_titulo_eventos': 'Eventos',
-      'ca_presenca_titulo': 'Asistencia',
-      'ca_presenca_registrados': 'Registrados',
-      'ca_presenca_vazio': 'Vacío',
-      'ca_presenca_salva_sucesso': '¡Guardado!',
-      'ca_presenca_nfc_lendo_titulo': 'Leyendo...',
-      'ca_presenca_nfc_lendo_desc': 'Tarjeta',
+      'prof_presenca_nfc_lendo_desc': 'Tarjeta',
       'aluno_perfil_status': 'Estado',
       'aluno_perfil_status_label': 'Estado',
       'aluno_perfil_cr': 'Promedio',

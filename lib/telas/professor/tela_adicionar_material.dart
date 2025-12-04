@@ -12,7 +12,6 @@ import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 
 /// Caso de uso para o Widgetbook.
-/// Simula a tela de adição de material.
 @UseCase(
   name: 'Adicionar Material',
   type: TelaAdicionarMaterial,
@@ -27,15 +26,9 @@ Widget buildTelaAdicionarMaterial(BuildContext context) {
 }
 
 /// Tela de formulário para o professor adicionar materiais de estudo.
-///
-/// Campos:
-/// - Título
-/// - Descrição
-/// - URL (Link/Vídeo)
-/// - Tipo (Link, Vídeo, Prova, Outro)
 class TelaAdicionarMaterial extends ConsumerStatefulWidget {
   final String turmaId;
-  final String nomeDisciplina; // Necessário para indexação global de provas antigas
+  final String nomeDisciplina; 
   
   const TelaAdicionarMaterial({
     super.key, 
@@ -67,11 +60,7 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
     super.dispose();
   }
   
-  /// Helper para normalizar o nome da disciplina (Ex: "Cálculo 1" -> "Cálculo").
-  /// Isso ajuda a agrupar provas antigas de diferentes anos/turmas.
   String _getNomeBase(String nome) {
-    // Remove números soltos no final se necessário, ou usa o nome completo.
-    // Para este exemplo, usamos o nome completo limpo.
     return nome.trim();
   }
 
@@ -108,7 +97,7 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(t.t('materiais_add_sucesso')), // "Material salvo!"
+            content: Text(t.t('materiais_add_sucesso')), // TRADUZIDO: "Material salvo!"
             backgroundColor: Colors.green,
           ),
         );
@@ -145,10 +134,16 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
         hintText: hint,
         filled: true,
         fillColor: inputFill,
+        labelStyle: TextStyle(color: textColor?.withOpacity(0.7)),
+        hintStyle: TextStyle(color: textColor?.withOpacity(0.5)),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16), 
             borderSide: BorderSide(color: borderColor)
+        ),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16), 
+            borderSide: const BorderSide(color: AppColors.primaryPurple)
         ),
       );
     }
@@ -156,8 +151,9 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        // TRADUZIDO: "Adicionar Material"
         title: Text(
-          t.t('materiais_add_titulo'), // "Adicionar Material"
+          t.t('materiais_add_titulo'), 
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
         ),
         backgroundColor: Colors.transparent,
@@ -175,8 +171,9 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
               TextFormField(
                 controller: _tituloController,
                 style: TextStyle(color: textColor),
-                decoration: inputDecor(t.t('materiais_add_titulo_label')), // "Título"
-                validator: (v) => (v == null || v.isEmpty) ? 'Obrigatório' : null,
+                // TRADUZIDO: "Título"
+                decoration: inputDecor(t.t('materiais_add_titulo_label')), 
+                validator: (v) => (v == null || v.isEmpty) ? t.t('erro_obrigatorio') : null,
               ),
               const SizedBox(height: 16),
               
@@ -184,7 +181,8 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
               TextFormField(
                 controller: _descricaoController,
                 style: TextStyle(color: textColor),
-                decoration: inputDecor(t.t('materiais_add_desc')), // "Descrição"
+                // TRADUZIDO: "Descrição"
+                decoration: inputDecor(t.t('materiais_add_desc')), 
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
@@ -193,13 +191,15 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
               TextFormField(
                 controller: _urlController,
                 style: TextStyle(color: textColor),
-                decoration: inputDecor(t.t('materiais_add_url'), hint: 'https://...'), // "Link (URL)"
+                // TRADUZIDO: "Link (URL)"
+                decoration: inputDecor(t.t('materiais_add_url'), hint: 'https://...'), 
                 keyboardType: TextInputType.url,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Obrigatório';
+                  if (v == null || v.isEmpty) return t.t('erro_obrigatorio');
                   final uri = Uri.tryParse(v);
                   if (uri == null || !uri.isAbsolute) {
-                    return 'Insira um link válido (ex: https://...)';
+                    // TRADUZIDO: "Insira um link válido..."
+                    return t.t('materiais_erro_link');
                   }
                   return null;
                 },
@@ -211,7 +211,8 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
                 value: _tipoSelecionado,
                 dropdownColor: inputFill,
                 style: TextStyle(color: textColor),
-                decoration: inputDecor(t.t('materiais_add_tipo')), // "Tipo"
+                // TRADUZIDO: "Tipo"
+                decoration: inputDecor(t.t('materiais_add_tipo')), 
                 items: [
                   DropdownMenuItem(
                     value: TipoMaterial.link,
@@ -243,7 +244,7 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save, color: Colors.white),
                 label: Text(
-                  _isLoading ? t.t('carregando') : t.t('materiais_add_salvar'), // "Salvar Material"
+                  _isLoading ? t.t('carregando') : t.t('materiais_add_salvar'), // TRADUZIDO
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
                 ),
                 onPressed: _isLoading ? null : _salvarMaterial,

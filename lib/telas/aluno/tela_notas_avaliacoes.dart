@@ -9,13 +9,13 @@ import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../comum/widget_carregamento.dart';
-import '../../models/disciplina_notas.dart'; // Modelo correto
-import '../../models/prova_agendada.dart';
-import '../../providers/provedor_mapas.dart';
+import '../../models/disciplina_notas.dart'; // Modelo de notas
+import '../../models/prova_agendada.dart'; // Modelo de provas
+import '../../providers/provedor_mapas.dart'; // Para abrir mapa
 import '../../l10n/app_localizations.dart'; // Traduções
+import '../../themes/app_theme.dart'; // Cores
 
 /// Caso de uso para o Widgetbook.
-/// Simula a tela de notas com dados fictícios.
 @UseCase(
   name: 'Notas e Avaliações',
   type: TelaNotasAvaliacoes,
@@ -26,11 +26,7 @@ Widget buildTelaNotasAvaliacoes(BuildContext context) {
   );
 }
 
-/// Tela que exibe o boletim do aluno e o calendário de provas.
-///
-/// Possui duas abas:
-/// 1. [Notas]: Lista expansível com detalhes de notas por matéria.
-/// 2. [Provas]: Lista cronológica de avaliações futuras.
+/// Tela que exibe as notas e as próximas avaliações do aluno.
 class TelaNotasAvaliacoes extends ConsumerWidget {
   /// Se fornecido, a lista de notas já abre expandida nesta disciplina.
   final String? disciplinaInicial;
@@ -40,13 +36,25 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color;
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
-          title: Text(t.t('notas_titulo')), // "Minhas Notas"
+          title: Text(
+            t.t('notas_titulo'), // "Minhas Notas"
+            style: TextStyle(color: textColor, fontWeight: FontWeight.bold)
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: IconThemeData(color: textColor),
           bottom: TabBar(
+            labelColor: AppColors.primaryPurple,
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: AppColors.primaryPurple,
             tabs: [
               Tab(text: t.t('notas_tab_notas')), // "Notas por Disciplina"
               Tab(text: t.t('notas_tab_provas')), // "Próximas Provas"
@@ -68,12 +76,18 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
     final t = AppLocalizations.of(context)!;
     final asyncNotas = ref.watch(provedorStreamNotasAluno);
     final crGeral = ref.watch(provedorNotificadorAutenticacao).usuario?.alunoInfo?.cr ?? 0.0;
+    
+    // Cores
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = theme.textTheme.bodyLarge?.color;
 
     return asyncNotas.when(
       loading: () => const WidgetCarregamento(),
-      error: (e,s) => Center(child: Text('Erro ao carregar notas: $e')),
+      error: (e,s) => Center(child: Text('${t.t('erro_generico')}: $e')),
       data: (notas) {
-        // Cálculos estatísticos rápidos
+        // Cálculos estatísticos
         final aprovadas = notas.where((n) => n.status == StatusDisciplina.aprovado).length;
         final emCurso = notas.where((n) => n.status == StatusDisciplina.emCurso).length;
 
@@ -81,34 +95,180 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             children: [
-              // Card de Estatísticas (CR, Aprovadas, Em Curso)
+              // Card de Estatísticas
               Row(
                 children: [
                   Expanded(
-                    child: _buildStatCard(context, t.t('notas_cr_geral'), crGeral.toStringAsFixed(2), Theme.of(context).colorScheme.primary, true),
+                    child: _buildStatCard(
+                      context, 
+                      t.t('notas_cr_geral'), // "CR Geral"
+                      crGeral.toStringAsFixed(2), 
+                      AppColors.primaryPurple, 
+                      true
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(context, t.t('notas_aprovado'), aprovadas.toString(), Colors.green),
+                    child: _buildStatCard(
+                      context, 
+                      t.t('notas_aprovado'), // "Aprovado"
+                      aprovadas.toString(), 
+                      Colors.green
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(context, t.t('notas_em_curso'), emCurso.toString(), Colors.orange),
+                    child: _buildStatCard(
+                      context, 
+                      t.t('notas_em_curso'), // "Em Curso"
+                      emCurso.toString(), 
+                      Colors.orange
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               
               if (notas.isEmpty)
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Text('Nenhuma nota lançada.'),
-                )),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Text(
+                      t.t('notas_vazio'), // "Nenhuma nota lançada"
+                      style: TextStyle(color: textColor?.withOpacity(0.6))
+                    ),
+                  )
+                ),
                 
-              // Lista de Disciplinas (Acordeão)
+              // Lista de Disciplinas (ExpansionTile)
               ...notas.map((disciplina) {
                 final bool expandir = disciplina.nome.startsWith(disciplinaInicial ?? '');
-                return _buildCardDisciplina(context, t, disciplina, expandir);
+                return Card(
+                  color: cardColor,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ExpansionTile(
+                    initiallyExpanded: expandir,
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                disciplina.nome,
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1, 
+                                overflow: TextOverflow.ellipsis, 
+                              ),
+                            ),
+                            const SizedBox(width: 8), 
+                            if (disciplina.status == StatusDisciplina.aprovado)
+                              Chip(
+                                label: Text(t.t('notas_aprovado')), 
+                                backgroundColor: Colors.green.withOpacity(0.2), 
+                                labelStyle: TextStyle(color: Colors.green[800], fontSize: 10), 
+                                padding: EdgeInsets.zero, 
+                                visualDensity: VisualDensity.compact
+                              ),
+                          ],
+                        ),
+                        Text(
+                          '${disciplina.codigo} • ${disciplina.professor}', 
+                          style: theme.textTheme.bodySmall
+                        ),
+                      ],
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        '${t.t('notas_media')}: ${disciplina.media.toStringAsFixed(1)}', 
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppColors.primaryPurple, 
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Column(
+                          children: [
+                            // Cabeçalho da Tabela
+                            Row(
+                              children: [
+                                Expanded(flex: 2, child: Text(t.t('notas_avaliacao'), style: theme.textTheme.bodySmall)),
+                                Expanded(flex: 2, child: Text(t.t('notas_data'), style: theme.textTheme.bodySmall)),
+                                Expanded(flex: 1, child: Text(t.t('notas_peso'), style: theme.textTheme.bodySmall, textAlign: TextAlign.center)),
+                                Expanded(flex: 1, child: Text(t.t('notas_nota'), style: theme.textTheme.bodySmall, textAlign: TextAlign.right)),
+                              ],
+                            ),
+                            const Divider(),
+                            
+                            // Lista de Avaliações
+                            ...disciplina.avaliacoes.map((av) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: Row(
+                                children: [
+                                  Expanded(flex: 2, child: Text(av.nome, style: TextStyle(color: textColor))),
+                                  Expanded(flex: 2, child: Text(av.data, style: theme.textTheme.bodySmall)),
+                                  Expanded(flex: 1, child: Text(av.peso.toString(), textAlign: TextAlign.center, style: TextStyle(color: textColor))),
+                                  Expanded(flex: 1, child: Text(
+                                    av.nota?.toStringAsFixed(1) ?? t.t('notas_pendente'),
+                                    textAlign: TextAlign.right,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold, 
+                                      color: av.nota == null ? Colors.grey : AppColors.primaryPurple
+                                    ),
+                                  )),
+                                ],
+                              ),
+                            )),
+
+                            // Alerta de Próxima Prova
+                            if (disciplina.proximaProva != null) ...[
+                              const Divider(height: 24),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange.withOpacity(0.3))
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${t.t('notas_proxima_prova')} ${disciplina.proximaProva!.titulo}', 
+                                            style: TextStyle(fontWeight: FontWeight.bold, color: textColor)
+                                          ),
+                                          Text(
+                                            DateFormat('dd/MM/yyyy \'às\' HH:mm').format(disciplina.proximaProva!.dataHora), 
+                                            style: TextStyle(color: textColor?.withOpacity(0.7), fontSize: 12)
+                                          ),
+                                          Text(
+                                            '${t.t('notas_conteudo')}: ${disciplina.proximaProva!.conteudo}', 
+                                            style: TextStyle(color: textColor?.withOpacity(0.7), fontSize: 12)
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }),
             ],
           ),
@@ -121,13 +281,18 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
   Widget _buildTabProvas(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final asyncProvas = ref.watch(provedorStreamCalendario);
-    final formatoMes = DateFormat.MMM('pt_BR');
-    final formatoDia = DateFormat.d('pt_BR');
+    
+    final formatoMes = DateFormat.MMM(Localizations.localeOf(context).toString());
+    final formatoDia = DateFormat.d(Localizations.localeOf(context).toString());
+    
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final textColor = theme.textTheme.bodyLarge?.color;
 
     return asyncProvas.when(
       loading: () => const WidgetCarregamento(),
-      error: (e,s) => Center(child: Text('Erro ao carregar provas: $e')),
+      error: (e,s) => Center(child: Text('${t.t('erro_generico')}: $e')),
       data: (provas) {
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -156,52 +321,71 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
               ),
               
               if (provas.isEmpty)
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: Text('Nenhuma prova agendada.'),
+                Center(child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Text(
+                    t.t('provas_vazio'), // "Nenhuma prova agendada"
+                    style: TextStyle(color: textColor?.withOpacity(0.6))
+                  ),
                 )),
                 
-              // Lista de Provas
+              // Lista Cronológica
               ...provas.map((prova) => Card(
+                color: cardColor,
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      // Data (Dia/Mês)
+                      // Data (Bloco Colorido)
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: AppColors.primaryPurple.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
                           children: [
                             Text(
-                              formatoMes.format(prova.dataHora).replaceAll('.', ''),
-                              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                              formatoMes.format(prova.dataHora).replaceAll('.', '').toUpperCase(),
+                              style: const TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
                             ),
                             Text(
                               formatoDia.format(prova.dataHora),
-                              style: theme.textTheme.titleLarge,
+                              style: TextStyle(
+                                fontSize: 20, 
+                                fontWeight: FontWeight.bold, 
+                                color: textColor
+                              ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 16),
                       
-                      // Detalhes (Título, Hora, Local)
+                      // Detalhes
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(prova.titulo, style: theme.textTheme.titleLarge),
+                            Text(prova.titulo, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(prova.disciplina, style: TextStyle(color: textColor?.withOpacity(0.7))),
                             const SizedBox(height: 8),
-                            _buildInfoProva(context, Icons.schedule, '${prova.dataHora.hour.toString().padLeft(2, '0')}:${prova.dataHora.minute.toString().padLeft(2, '0')}'),
+                            _buildInfoProva(
+                              context, 
+                              Icons.schedule, 
+                              '${prova.dataHora.hour.toString().padLeft(2, '0')}:${prova.dataHora.minute.toString().padLeft(2, '0')}',
+                              textColor
+                            ),
                             _buildInfoProva(
                               context, 
                               Icons.location_on_outlined, 
                               '${prova.predio} - ${prova.sala}',
-                              isLink: true, // Clicável para abrir mapa
+                              textColor,
+                              isLink: true, 
                               onTap: () async {
                                 try {
                                   await ref.read(provedorMapas).abrirLocalizacao(prova.predio);
@@ -212,9 +396,6 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
                                 }
                               }
                             ),
-                            const Divider(height: 16),
-                            Text('${t.t('notas_conteudo')}:', style: theme.textTheme.bodySmall),
-                            Text(prova.conteudo, style: theme.textTheme.bodyMedium),
                           ],
                         ),
                       ),
@@ -231,148 +412,53 @@ class TelaNotasAvaliacoes extends ConsumerWidget {
 
   // --- WIDGETS AUXILIARES ---
 
-  /// Cartão estatístico pequeno (CR, Aprovadas, etc).
   Widget _buildStatCard(BuildContext context, String label, String value, Color color, [bool isPrimary = false]) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Adapta a cor do texto se o fundo for claro
+    final textCol = isPrimary ? Colors.white : (isDark ? Colors.white : Colors.black87);
+
     return Card(
       elevation: 0,
       color: isPrimary ? color : color.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 12, color: isPrimary ? theme.colorScheme.onPrimary : color)),
-            Text(value, style: theme.textTheme.titleLarge?.copyWith(
-              color: isPrimary ? theme.colorScheme.onPrimary : color,
-              fontWeight: FontWeight.bold,
-            )),
+            Text(label, style: TextStyle(fontSize: 12, color: textCol.withOpacity(0.8))),
+            const SizedBox(height: 4),
+            Text(
+              value, 
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: textCol,
+                fontWeight: FontWeight.bold,
+              )
+            ),
           ],
         ),
       ),
     );
   }
-  
-  /// Cartão expansível de disciplina com notas.
-  Widget _buildCardDisciplina(BuildContext context, AppLocalizations t, DisciplinaNotas disciplina, bool expandir) {
-    final theme = Theme.of(context);
-    return Card(
-      child: ExpansionTile(
-        initiallyExpanded: expandir,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    disciplina.nome,
-                    style: theme.textTheme.titleMedium,
-                    maxLines: 1, 
-                    overflow: TextOverflow.ellipsis, 
-                  ),
-                ),
-                const SizedBox(width: 8), 
-                if (disciplina.status == StatusDisciplina.aprovado)
-                  Chip(label: Text(t.t('notas_aprovado')), backgroundColor: Colors.green.withOpacity(0.2), labelStyle: TextStyle(color: Colors.green[800], fontSize: 10), padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-              ],
-            ),
-            Text('${disciplina.codigo} • ${disciplina.professor}', style: theme.textTheme.bodySmall),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8.0),
-          child: Text('${t.t('notas_media')}: ${disciplina.media}', style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Column(
-              children: [
-                // Cabeçalho da Tabela de Notas
-                Row(
-                  children: [
-                    Expanded(flex: 2, child: Text(t.t('notas_avaliacao'), style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(t.t('notas_data'), style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 1, child: Text(t.t('notas_peso'), style: theme.textTheme.bodySmall, textAlign: TextAlign.center)),
-                    Expanded(flex: 1, child: Text(t.t('notas_nota'), style: theme.textTheme.bodySmall, textAlign: TextAlign.right)),
-                  ],
-                ),
-                const Divider(),
-                
-                // Lista de Notas
-                ...disciplina.avaliacoes.map((av) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 2, child: Text(av.nome)),
-                      Expanded(flex: 2, child: Text(av.data, style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 1, child: Text(av.peso.toString(), textAlign: TextAlign.center)),
-                      Expanded(flex: 1, child: Text(
-                        av.nota?.toStringAsFixed(1) ?? t.t('notas_pendente'),
-                        textAlign: TextAlign.right,
-                        style: TextStyle(fontWeight: FontWeight.bold, color: av.nota == null ? Colors.grey : theme.colorScheme.primary),
-                      )),
-                    ],
-                  ),
-                )),
 
-                // Alerta de Próxima Prova (se houver)
-                if (disciplina.proximaProva != null) ...[
-                  const Divider(height: 24),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.yellow.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${t.t('notas_proxima_prova')} ${disciplina.proximaProva!.titulo}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              
-                              // CORREÇÃO AQUI: .dataHora em vez de .data
-                              Text(DateFormat('dd/MM/yyyy \'às\' HH:mm').format(disciplina.proximaProva!.dataHora), style: theme.textTheme.bodySmall),
-                              
-                              Text('${t.t('notas_conteudo')}: ${disciplina.proximaProva!.conteudo}', style: theme.textTheme.bodySmall),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoProva(BuildContext context, IconData icon, String text, {bool isLink = false, VoidCallback? onTap}) {
-    final theme = Theme.of(context);
-    final style = theme.textTheme.bodySmall?.copyWith(
-      color: isLink ? theme.colorScheme.primary : theme.textTheme.bodySmall?.color,
+  Widget _buildInfoProva(BuildContext context, IconData icon, String text, Color? color, {bool isLink = false, VoidCallback? onTap}) {
+    final style = TextStyle(
+      fontSize: 12,
+      color: isLink ? AppColors.primaryPurple : color?.withOpacity(0.7),
       decoration: isLink ? TextDecoration.underline : TextDecoration.none,
     );
+    
     final row = Row(
       children: [
-        Icon(icon, size: 14, color: style?.color),
+        Icon(icon, size: 14, color: style.color),
         const SizedBox(width: 4),
         Text(text, style: style),
       ],
     );
+    
     if (isLink) {
-      return InkWell(
-        onTap: onTap,
-        child: row,
-      );
+      return InkWell(onTap: onTap, child: row);
     }
     return row;
   }

@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart'; 
 import '../../models/prova_agendada.dart'; 
@@ -17,7 +16,6 @@ import '../../themes/app_theme.dart';
 import '../comum/animacao_fadein_lista.dart'; 
 import '../comum/widget_carregamento.dart';
 
-// Import das telas de destino
 import 'tela_notas_avaliacoes.dart';
 import 'tela_solicitar_adaptacao.dart';
 import 'tela_cadastro_nfc.dart';
@@ -25,8 +23,6 @@ import 'tela_drive_provas.dart';
 import 'tela_dicas_gerais.dart'; 
 import 'tela_calendario.dart';   
 
-/// Caso de uso para o Widgetbook.
-/// Simula a tela inicial do aluno.
 @UseCase(
   name: 'Home Aluno',
   type: AbaInicioAluno,
@@ -37,8 +33,6 @@ Widget buildAbaInicioAluno(BuildContext context) {
   );
 }
 
-/// Provedor que busca uma frase motivacional aleatória de uma API pública.
-/// Retorna uma String com a frase ou uma mensagem padrão em caso de erro.
 final quoteProvider = FutureProvider<String>((ref) async {
   try {
     final response = await http.get(Uri.parse('https://api.adviceslip.com/advice'));
@@ -52,38 +46,24 @@ final quoteProvider = FutureProvider<String>((ref) async {
   }
 });
 
-/// Tela Inicial do Aluno (Dashboard).
-/// 
-/// Exibe:
-/// 1. Cabeçalho com saudação e frase do dia.
-/// 2. Card de Status com CR e Situação.
-/// 3. Atalhos rápidos para Drive, Dicas, Adaptação e Calendário.
-/// 4. Lista das próximas avaliações.
 class AbaInicioAluno extends ConsumerWidget {
   const AbaInicioAluno({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    
-    // Streams de dados
     final asyncProvas = ref.watch(provedorStreamCalendario); 
     final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
     final asyncQuote = ref.watch(quoteProvider);
 
-    // Dados do usuário (com fallback seguro)
     final nomeAluno = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Aluno';
-    final cr = usuario?.alunoInfo?.cr ?? 0.0;
 
-    // Configuração de Tema
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
-    // Funções de Navegação
     void _abrirDriveGlobal() {
          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDriveProvas()));
     }
@@ -91,7 +71,6 @@ class AbaInicioAluno extends ConsumerWidget {
          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDicasGerais()));
     }
 
-    // Lista de widgets para a animação de entrada
     final widgets = [
       // 1. CABEÇALHO
       Row(
@@ -114,7 +93,6 @@ class AbaInicioAluno extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              // Frase do dia (Async)
               asyncQuote.when(
                 data: (frase) => SizedBox(
                   width: 250, 
@@ -130,7 +108,6 @@ class AbaInicioAluno extends ConsumerWidget {
               ),
             ],
           ),
-          // Ícone de Notificação
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -144,45 +121,6 @@ class AbaInicioAluno extends ConsumerWidget {
       ),
 
       const SizedBox(height: 24),
-
-      // 2. CARD DE STATUS (Destaque Laranja)
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF8A65), Color(0xFFFF7043)], 
-            begin: Alignment.topLeft, 
-            end: Alignment.bottomRight
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFF7043).withOpacity(0.3), 
-              blurRadius: 12, 
-              offset: const Offset(0, 6)
-            )
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildStatusItem(
-              icon: Icons.auto_graph, 
-              value: cr.toStringAsFixed(1), 
-              label: t.t('status_cr') // "CR Geral"
-            ),
-            Container(width: 1, height: 40, color: Colors.white30),
-            _buildStatusItem(
-              icon: Icons.check_circle_outline, 
-              value: t.t('status_ativo'), // "Ativo"
-              label: t.t('aluno_perfil_status') // "Status"
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 32),
 
       // 3. ACESSO RÁPIDO
       Text(
@@ -207,7 +145,7 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 32),
 
-      // 4. PRÓXIMAS AVALIAÇÕES (Lista)
+      // 4. PRÓXIMAS AVALIAÇÕES
       Text(
         t.t('inicio_proximas_avaliacoes'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
@@ -220,7 +158,8 @@ class AbaInicioAluno extends ConsumerWidget {
         data: (provas) {
           if (provas.isEmpty) {
             return Container(
-              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
               child: Center(child: Text(t.t('inicio_sem_provas'), style: TextStyle(color: subTextColor))),
             );
@@ -260,28 +199,17 @@ class AbaInicioAluno extends ConsumerWidget {
     );
   }
 
-  /// Constrói um item do card de status (Ícone + Valor + Label).
   Widget _buildStatusItem({required IconData icon, required String value, required String label}) {
-    return Row(
+    return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-          ],
-        ),
+        Icon(icon, color: Colors.white, size: 28),
+        const SizedBox(height: 8),
+        Text(value, style: GoogleFonts.poppins(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
       ],
     );
   }
 
-  /// Constrói um item de acesso rápido (Quadrado colorido).
   Widget _buildCategoryItem(BuildContext context, {
       required IconData icon, 
       required String label, 
@@ -295,14 +223,7 @@ class AbaInicioAluno extends ConsumerWidget {
         children: [
           Container(
             height: 55, width: 55,
-            decoration: BoxDecoration(
-              color: color, 
-              borderRadius: BorderRadius.circular(16),
-              // Sombra sutil no modo claro
-              boxShadow: Theme.of(context).brightness == Brightness.light 
-                  ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))] 
-                  : []
-            ),
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
             child: Icon(icon, color: iconColor, size: 26),
           ),
           const SizedBox(height: 8),
@@ -318,17 +239,11 @@ class AbaInicioAluno extends ConsumerWidget {
     );
   }
 
-  /// Constrói o cartão de uma prova na lista.
   Widget _buildResultCard(ProvaAgendada prova, Color cardColor, Color titleColor, Color subtitleColor) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardColor, 
-        borderRadius: BorderRadius.circular(20),
-        // Borda sutil no modo claro para contraste com fundo branco
-        border: titleColor == Colors.black87 ? Border.all(color: Colors.black12) : null
-      ),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
       child: Row(
         children: [
           CircleAvatar(
@@ -345,12 +260,7 @@ class AbaInicioAluno extends ConsumerWidget {
                 const SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4), 
-                  child: LinearProgressIndicator(
-                    value: 0.7, // Valor fixo visual (MVP)
-                    color: AppColors.cardBlue, 
-                    backgroundColor: subtitleColor.withOpacity(0.1), 
-                    minHeight: 6
-                  )
+                  child: LinearProgressIndicator(value: 0.7, color: AppColors.cardBlue, backgroundColor: subtitleColor.withOpacity(0.1), minHeight: 6)
                 ),
               ],
             ),

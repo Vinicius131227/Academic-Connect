@@ -95,8 +95,9 @@ class AbaMateriaisProfessor extends ConsumerWidget {
                     style: TextStyle(color: textColor?.withOpacity(0.7))
                   ),
                   const SizedBox(height: 8),
+                  // TRADUZIDO: "Clique no + para adicionar conteúdo"
                   Text(
-                    "Clique no + para adicionar conteúdo.",
+                    t.t('materiais_ajuda_add'),
                     style: TextStyle(color: textColor?.withOpacity(0.5), fontSize: 12),
                   )
                 ],
@@ -124,8 +125,9 @@ class AbaMateriaisProfessor extends ConsumerWidget {
                 onDismissed: (direction) {
                    // Exclui do banco
                    ref.read(servicoFirestoreProvider).removerMaterial(turma.id, material.id);
+                   // TRADUZIDO: "Material removido."
                    ScaffoldMessenger.of(context).showSnackBar(
-                     const SnackBar(content: Text("Material removido."))
+                     SnackBar(content: Text(t.t('materiais_removido')))
                    );
                 },
                 child: Card(
@@ -162,10 +164,10 @@ class AbaMateriaisProfessor extends ConsumerWidget {
                     trailing: Icon(Icons.open_in_new, color: textColor?.withOpacity(0.3), size: 18),
                     // Ação de clique (Abrir)
                     onTap: () {
-                       Navigator.push(
-                         context, 
-                         MaterialPageRoute(builder: (_) => TelaWebView(url: material.url, titulo: material.titulo))
-                       );
+                        Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (_) => TelaWebView(url: material.url, titulo: material.titulo))
+                        );
                     },
                   ),
                 ),

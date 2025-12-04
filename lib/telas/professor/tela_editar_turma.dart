@@ -14,7 +14,6 @@ import '../comum/overlay_carregamento.dart';
 import '../../themes/app_theme.dart'; // Cores e Temas
 
 /// Caso de uso para o Widgetbook.
-/// Simula a tela de edição de turma.
 @UseCase(
   name: 'Editar Turma',
   type: TelaEditarTurma,
@@ -77,25 +76,27 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
     _creditosSelecionados = widget.turma.creditos;
     
     // Parse do local (Ex: "AT1 - 102")
-    // Tenta separar prédio e sala para preencher o formulário
     final localParts = widget.turma.local.split(' - ');
-    if (localParts.length > 1 && AppLocalizations.predios.contains(localParts[0])) {
+    // Verifica se a primeira parte é um dos prédios conhecidos
+    // OBS: Como AppLocalizations precisa de context, aqui acessamos a lista estática
+    // Se a lista no AppLocalizations deixar de ser estática (como mudamos antes), 
+    // essa verificação no initState pode falhar. 
+    // Para segurança, assumimos que se tiver hífen, é Prédio - Sala.
+    if (localParts.length > 1) {
       _predioSelecionado = localParts[0];
       _salaController = TextEditingController(text: localParts[1]);
     } else {
-      // Se não estiver no formato padrão, coloca tudo na sala
       _salaController = TextEditingController(text: widget.turma.local);
     }
 
-    // Parse dos horários (Ex: "Seg 08:00-10:00, Qua 14:00-16:00")
+    // Parse dos horários
     if (widget.turma.horario.isNotEmpty) {
       final horariosStr = widget.turma.horario.split(', ');
       for (var h in horariosStr) {
         try {
-          // Tenta extrair dia, inicio e fim
-          final parts = h.split(' '); // ["Seg", "08:00-10:00"]
+          final parts = h.split(' '); 
           final dia = parts[0];
-          final times = parts[1].split('-'); // ["08:00", "10:00"]
+          final times = parts[1].split('-'); 
           final start = times[0].split(':');
           final end = times[1].split(':');
           
@@ -105,7 +106,7 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
             fim: TimeOfDay(hour: int.parse(end[0]), minute: int.parse(end[1])),
           ));
         } catch (e) {
-          // Ignora erros de parse se o formato estiver corrompido
+          // Ignora erros de parse
         }
       }
     }
@@ -118,7 +119,6 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
     super.dispose();
   }
 
-  /// Recria a string de horário a partir da lista editada.
   String _gerarStringHorario() {
     return _horarios.map((h) {
       final inicio = '${h.inicio.hour.toString().padLeft(2,'0')}:${h.inicio.minute.toString().padLeft(2,'0')}';
@@ -127,11 +127,11 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
     }).join(', ');
   }
 
-  /// Adiciona um novo slot de horário.
   void _adicionarHorario() {
+    final t = AppLocalizations.of(context)!;
     if (_horarios.length >= 2) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Máx: 2 dias/aula'), backgroundColor: Colors.orange),
+         SnackBar(content: Text(t.t('erro_max_dias')), backgroundColor: Colors.orange),
        );
        return;
     }
@@ -150,7 +150,6 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
     });
   }
   
-  /// Abre seletor de hora.
   Future<void> _pickTime(int index, bool isInicio) async {
     final item = _horarios[index];
     final initial = isInicio ? item.inicio : item.fim;
@@ -158,35 +157,30 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
     final t = await showTimePicker(context: context, initialTime: initial);
     if (t == null) return;
     
-    // Validações básicas
-    if (isInicio && t.hour >= item.fim.hour && t.minute >= item.fim.minute) {
-       // Aviso simples
-    }
-
     setState(() {
       if (isInicio) item.inicio = t; else item.fim = t;
     });
   }
 
-  /// Salva as alterações no Firestore.
   Future<void> _salvarTurma() async {
+    final t = AppLocalizations.of(context)!;
+
     // 1. Validações
     if (!_formKey.currentState!.validate() || _predioSelecionado == null) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Preencha todos os campos e selecione o prédio.'), backgroundColor: Colors.red),
+         SnackBar(content: Text(t.t('erro_preencher_tudo')), backgroundColor: Colors.red),
        );
        return;
     }
     if (_horarios.isEmpty) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Adicione pelo menos um horário.'), backgroundColor: Colors.red),
+         SnackBar(content: Text(t.t('erro_sem_horario')), backgroundColor: Colors.red),
        );
        return;
     }
 
     // 2. Loading
     ref.read(provedorCarregando.notifier).state = true;
-    final t = AppLocalizations.of(context)!;
     
     try {
       // 3. Cria objeto atualizado
@@ -207,7 +201,8 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
       if (mounted) {
         ref.read(provedorCarregando.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(t.t('aluno_perfil_edit_sucesso')), backgroundColor: Colors.green), // "Sucesso"
+          // TRADUZIDO: "Turma atualizada com sucesso!"
+          SnackBar(content: Text(t.t('prof_turma_atualizada')), backgroundColor: Colors.green), 
         );
         Navigator.pop(context);
       }
@@ -215,13 +210,13 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
       if (mounted) {
         ref.read(provedorCarregando.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao atualizar: $e'), backgroundColor: Colors.red),
+          // TRADUZIDO: "Erro ao atualizar: ..."
+          SnackBar(content: Text(t.t('erro_atualizar', args: [e.toString()])), backgroundColor: Colors.red),
         );
       }
     }
   }
   
-  // Helper para input decoration com tema
   InputDecoration _inputDecor(BuildContext context, String label, {String? hint}) {
       final theme = Theme.of(context);
       final isDark = theme.brightness == Brightness.dark;
@@ -255,7 +250,7 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          t.t('prof_editar_turma'), // "Editar Turma"
+          t.t('prof_editar_turma'), 
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
         ),
         backgroundColor: Colors.transparent,
@@ -274,7 +269,7 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                 controller: _nomeController,
                 style: TextStyle(color: textColor),
                 decoration: _inputDecor(context, t.t('criar_turma_nome')),
-                validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                validator: (v) => v!.isEmpty ? t.t('erro_obrigatorio') : null,
               ),
               const SizedBox(height: 16),
               
@@ -288,9 +283,9 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                       dropdownColor: dropdownColor,
                       style: TextStyle(color: textColor),
                       decoration: _inputDecor(context, t.t('criar_turma_local')),
-                      items: AppLocalizations.predios.map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(color: textColor)))).toList(),
+                      items: t.predios.map((p) => DropdownMenuItem(value: p, child: Text(p, style: TextStyle(color: textColor)))).toList(),
                       onChanged: estaCarregando ? null : (v) => setState(() => _predioSelecionado = v),
-                      validator: (v) => v == null ? 'Obrigatório' : null,
+                      validator: (v) => v == null ? t.t('erro_obrigatorio') : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -299,8 +294,9 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                     child: TextFormField(
                       controller: _salaController,
                       style: TextStyle(color: textColor),
-                      decoration: _inputDecor(context, 'Sala', hint: t.t('criar_turma_local_hint')),
-                      validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+                      // TRADUZIDO: "Sala"
+                      decoration: _inputDecor(context, t.t('criar_turma_sala'), hint: t.t('criar_turma_local_hint')),
+                      validator: (v) => v!.isEmpty ? t.t('erro_obrigatorio') : null,
                     ),
                   ),
                 ],
@@ -328,9 +324,9 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                     color: isDark ? AppColors.surface : Colors.white,
-                     borderRadius: BorderRadius.circular(12),
-                     border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      color: isDark ? AppColors.surface : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
@@ -344,12 +340,12 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                       ),
                       const SizedBox(width: 16),
                       InkWell(
-                        child: Text('${item.inicio.format(context)}', style: TextStyle(color: textColor, fontSize: 16)),
+                        child: Text(item.inicio.format(context), style: TextStyle(color: textColor, fontSize: 16)),
                         onTap: () => _pickTime(index, true),
                       ),
                       const Text(' - '),
                       InkWell(
-                        child: Text('${item.fim.format(context)}', style: TextStyle(color: textColor, fontSize: 16)),
+                        child: Text(item.fim.format(context), style: TextStyle(color: textColor, fontSize: 16)),
                         onTap: () => _pickTime(index, false),
                       ),
                       const Spacer(),
@@ -375,7 +371,7 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(
-                    estaCarregando ? t.t('carregando') : t.t('salvar'), 
+                    estaCarregando ? t.t('carregando') : t.t('prof_editar_salvar'), // TRADUZIDO: "Salvar Alterações"
                     style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
                   ),
                 ),

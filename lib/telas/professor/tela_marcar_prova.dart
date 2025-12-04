@@ -13,7 +13,6 @@ import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 
 /// Caso de uso para o Widgetbook.
-/// Simula a tela de marcação de prova para uma turma fictícia.
 @UseCase(
   name: 'Marcar Prova',
   type: TelaMarcarProva,
@@ -36,7 +35,6 @@ Widget buildTelaMarcarProva(BuildContext context) {
 }
 
 /// Tela onde o professor agenda avaliações.
-/// Salva os dados na coleção 'provas' do Firestore.
 class TelaMarcarProva extends ConsumerStatefulWidget {
   final TurmaProfessor turma;
   
@@ -77,7 +75,7 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
       context: context,
       initialDate: _dataSelecionada ?? DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime(2030), // Permite agendar anos à frente
+      lastDate: DateTime(2030), 
     );
     if (data != null) {
       setState(() => _dataSelecionada = data);
@@ -97,9 +95,11 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
 
   /// Valida e salva a prova no Firestore.
   Future<void> _salvarProva() async {
+    final t = AppLocalizations.of(context)!;
+
     if (!_formKey.currentState!.validate() || _dataSelecionada == null || _horaSelecionada == null || _predioSelecionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha todos os campos (Data, Hora, Prédio).'), backgroundColor: Colors.red),
+        SnackBar(content: Text(t.t('erro_preencher_tudo_prova')), backgroundColor: Colors.red),
       );
       return;
     }
@@ -116,10 +116,10 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
     );
 
     final novaProva = ProvaAgendada(
-      id: '', // Gerado pelo banco
+      id: '', 
       turmaId: widget.turma.id,
       titulo: _tituloController.text,
-      disciplina: widget.turma.nome, // Salva o nome para facilitar exibição no calendário
+      disciplina: widget.turma.nome, 
       dataHora: dataHoraCompleta,
       predio: _predioSelecionado!,
       sala: _salaController.text, 
@@ -131,14 +131,14 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Prova marcada com sucesso!'), backgroundColor: Colors.green),
+          SnackBar(content: Text(t.t('marcar_prova_sucesso')), backgroundColor: Colors.green),
         );
-        Navigator.of(context).pop(); // Volta para o hub da disciplina
+        Navigator.of(context).pop(); 
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('${t.t('erro_generico')}: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -153,20 +153,20 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
     final t = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final textColor = theme.textTheme.bodyLarge?.color;
+    final isDark = theme.brightness == Brightness.dark;
     
-    // Formatação de strings para os botões
     final dataFormatada = _dataSelecionada == null 
-        ? t.t('ca_eventos_criar_data') // "Selecionar Data"
+        ? t.t('marcar_prova_selecionar_data')
         : DateFormat('dd/MM/yyyy').format(_dataSelecionada!);
         
     final horaFormatada = _horaSelecionada == null 
-        ? 'Selecionar Hora *' 
+        ? t.t('marcar_prova_selecionar_hora')
         : _horaSelecionada!.format(context);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text('Marcar Prova - ${widget.turma.nome}', style: TextStyle(color: textColor)),
+        title: Text(t.t('marcar_prova_titulo_screen', args: [widget.turma.nome]), style: TextStyle(color: textColor)),
         iconTheme: IconThemeData(color: textColor),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -182,12 +182,14 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
               TextFormField(
                 controller: _tituloController,
                 style: TextStyle(color: textColor),
-                decoration: const InputDecoration(
-                  labelText: 'Título da Avaliação *',
-                  hintText: 'Ex: P1 - Prova N1',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.t('marcar_prova_titulo_label'),
+                  hintText: t.t('marcar_prova_titulo_hint'),
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: isDark ? AppColors.surfaceDark : Colors.white,
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+                validator: (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null,
               ),
               const SizedBox(height: 16),
               
@@ -221,15 +223,21 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
               ),
               const SizedBox(height: 16),
               
-              // Prédio
+              // Prédio (CORRIGIDO AQUI)
               DropdownButtonFormField<String>(
                 value: _predioSelecionado,
                 style: TextStyle(color: textColor),
                 dropdownColor: theme.cardColor,
-                decoration: const InputDecoration(labelText: 'Prédio *', border: OutlineInputBorder()),
-                items: AppLocalizations.predios.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                decoration: InputDecoration(
+                  labelText: t.t('marcar_prova_predio'), 
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: isDark ? AppColors.surfaceDark : Colors.white,
+                ),
+                // CORREÇÃO: Usando t.predios (instância)
+                items: t.predios.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
                 onChanged: (v) => setState(() => _predioSelecionado = v),
-                validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+                validator: (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null,
               ),
               const SizedBox(height: 16),
               
@@ -237,12 +245,14 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
               TextFormField(
                 controller: _salaController,
                 style: TextStyle(color: textColor),
-                decoration: const InputDecoration(
-                  labelText: 'Sala *',
-                  hintText: 'Ex: 105 ou Lab 3',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.t('marcar_prova_sala'),
+                  hintText: t.t('marcar_prova_sala_hint'),
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: isDark ? AppColors.surfaceDark : Colors.white,
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+                validator: (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null,
               ),
               const SizedBox(height: 16),
               
@@ -250,13 +260,15 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
               TextFormField(
                 controller: _conteudoController,
                 style: TextStyle(color: textColor),
-                decoration: const InputDecoration(
-                  labelText: 'Conteúdo Abordado *',
-                  hintText: 'Ex: Capítulos 1-3, Funções e Laços',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: t.t('marcar_prova_conteudo'),
+                  hintText: t.t('marcar_prova_conteudo_hint'),
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: isDark ? AppColors.surfaceDark : Colors.white,
                 ),
                 maxLines: 3,
-                validator: (v) => (v == null || v.isEmpty) ? 'Campo obrigatório' : null,
+                validator: (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null,
               ),
               
               const SizedBox(height: 24),
@@ -266,7 +278,7 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
                 icon: _isLoading 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
                     : const Icon(Icons.save),
-                label: Text(_isLoading ? 'Salvando...' : 'Salvar Prova'),
+                label: Text(_isLoading ? t.t('marcar_prova_salvando') : t.t('marcar_prova_salvar_btn')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   foregroundColor: Colors.white,
