@@ -66,12 +66,13 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
 
   /// Valida e salva o material no Firestore.
   Future<void> _salvarMaterial() async {
+    final t = AppLocalizations.of(context)!;
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     setState(() => _isLoading = true);
-    final t = AppLocalizations.of(context)!;
     
     // Gera o nome base para indexação
     final nomeBase = _getNomeBase(widget.nomeDisciplina);
@@ -213,22 +214,23 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
                 style: TextStyle(color: textColor),
                 // TRADUZIDO: "Tipo"
                 decoration: inputDecor(t.t('materiais_add_tipo')), 
+                // Itens traduzidos
                 items: [
                   DropdownMenuItem(
                     value: TipoMaterial.link,
-                    child: Text(t.t('materiais_tipo_link')),
+                    child: Text(t.t('materiais_tipo_link')), // "Link" / "Enlace"
                   ),
                   DropdownMenuItem(
                     value: TipoMaterial.video,
-                    child: Text(t.t('materiais_tipo_video')),
+                    child: Text(t.t('materiais_tipo_video')), // "Vídeo"
                   ),
                   DropdownMenuItem(
                     value: TipoMaterial.prova,
-                    child: Text(t.t('materiais_tipo_prova')),
+                    child: Text(t.t('materiais_tipo_prova')), // "Prova Antiga" / "Examen Antiguo"
                   ),
                   DropdownMenuItem(
                     value: TipoMaterial.outro,
-                    child: Text(t.t('materiais_tipo_outro')),
+                    child: Text(t.t('materiais_tipo_outro')), // "Outro" / "Otro"
                   ),
                 ],
                 onChanged: (v) {
@@ -244,7 +246,7 @@ class _TelaAdicionarMaterialState extends ConsumerState<TelaAdicionarMaterial> {
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.save, color: Colors.white),
                 label: Text(
-                  _isLoading ? t.t('carregando') : t.t('materiais_add_salvar'), // TRADUZIDO
+                  _isLoading ? t.t('carregando') : t.t('materiais_add_salvar'), // TRADUZIDO: "Salvar Material"
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
                 ),
                 onPressed: _isLoading ? null : _salvarMaterial,

@@ -201,7 +201,7 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
               TextFormField(
                 controller: _nomeController,
                 style: TextStyle(color: textColor),
-                decoration: InputDecoration(hintText: "Digite seu nome"),
+                decoration: InputDecoration(hintText: "${t.t('editar_digite_nome')}..."),
                 validator: (v) => v!.isEmpty ? t.t('campo_obrigatorio') : null,
               ),
               const SizedBox(height: 20),
@@ -211,7 +211,7 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
               TextFormField(
                 controller: _raController,
                 style: TextStyle(color: textColor),
-                decoration: const InputDecoration(hintText: "Digite o número"),
+                decoration: InputDecoration(hintText: t.t('editar_digite_numero')),
                 keyboardType: TextInputType.text,
                 validator: (v) => v!.isEmpty ? t.t('campo_obrigatorio') : null,
               ),
@@ -225,7 +225,7 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
                   value: _cursoSelecionado,
                   style: TextStyle(color: textColor),
                   dropdownColor: theme.cardTheme.color, 
-                  decoration: const InputDecoration(hintText: "Selecione o curso"),
+                  decoration: InputDecoration(hintText: t.t('editar_seleciona_curso')),
                   // CORREÇÃO 2: Usando t.cursos
                   items: t.cursos.map((c) => DropdownMenuItem(
                     value: c, 

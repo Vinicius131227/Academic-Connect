@@ -5,14 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-// Importações locais
+// Importações locais (Mantive suas importações originais)
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 
 /// Tela para recuperação de senha via e-mail.
-/// 
-/// Permite que o usuário insira seu e-mail e receba um link de redefinição
-/// enviado pelo Firebase Authentication.
 class TelaEsqueceuSenha extends ConsumerStatefulWidget {
   const TelaEsqueceuSenha({super.key});
 
@@ -23,7 +20,7 @@ class TelaEsqueceuSenha extends ConsumerStatefulWidget {
 class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _isLoading = false; // Controla o estado do botão de envio
+  bool _isLoading = false; 
 
   @override
   void dispose() {
@@ -33,20 +30,16 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
 
   /// Função para enviar o link de redefinição de senha.
   Future<void> _enviarLink() async {
-    // 1. Valida o campo de e-mail
     if (!_formKey.currentState!.validate()) return;
     
-    // 2. Ativa o loading
     setState(() => _isLoading = true);
     
     try {
-      // 3. Chama o Firebase Auth
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
 
       if (mounted) {
-        // 4. Sucesso: Mostra mensagem e fecha a tela
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Link enviado para ${_emailController.text}'), 
@@ -56,7 +49,6 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
         Navigator.of(context).pop(); 
       }
     } on FirebaseAuthException catch (e) {
-      // 5. Erro específico do Firebase
       if (mounted) {
         String msg = 'Erro ao enviar.';
         if (e.code == 'user-not-found') msg = 'E-mail não cadastrado.';
@@ -67,14 +59,12 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
         );
       }
     } catch (e) {
-      // 6. Erro genérico
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Erro inesperado.'), backgroundColor: Colors.redAccent)
         );
       }
     } finally {
-      // 7. Para o loading
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -85,16 +75,13 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    // Definição de cores dinâmicas baseadas no tema
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    // Garante cor não nula para usar com transparência
     final subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final isDesktop = MediaQuery.of(context).size.width > 800;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, // Fundo dinâmico (Branco/Preto)
+      backgroundColor: theme.scaffoldBackgroundColor,
       
-      // AppBar transparente apenas para o botão de voltar
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -103,7 +90,7 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
           onPressed: () => Navigator.pop(context)
         ),
       ),
-      extendBodyBehindAppBar: true, // Conteúdo sobe atrás da AppBar
+      extendBodyBehindAppBar: true,
       
       body: Row(
         children: [
@@ -120,7 +107,7 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Ícone de Cadeado
+                        // Ícone de Cadeado (Pequeno - Topo do form)
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -131,7 +118,6 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
                         ),
                         const SizedBox(height: 24),
                         
-                        // Títulos
                         Text(
                           t.t('esqueceu_titulo'), // "Esqueceu a Senha?"
                           style: GoogleFonts.poppins(
@@ -157,7 +143,6 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
                             prefixIcon: Icon(Icons.email_outlined, color: subTextColor),
                             filled: true,
                             fillColor: Colors.transparent,
-                            // Bordas adaptáveis
                             enabledBorder: UnderlineInputBorder(
                               borderSide: BorderSide(color: subTextColor.withOpacity(0.3))
                             ),
@@ -230,7 +215,67 @@ class _TelaEsqueceuSenhaState extends ConsumerState<TelaEsqueceuSenha> {
           if (isDesktop) 
             Expanded(
               flex: 5, 
-              child: Container(color: AppColors.primaryPurple)
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primaryPurple,
+                      // Cria um degradê sutil usando a cor primária
+                      AppColors.primaryPurple.withOpacity(0.8),
+                      // Você pode adicionar uma cor mais escura aqui se desejar mais contraste
+                    ],
+                  ),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Ícone Grande Decorativo
+                      Container(
+                        padding: const EdgeInsets.all(30),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.1),
+                          border: Border.all(color: Colors.white.withOpacity(0.2), width: 2)
+                        ),
+                        child: const Icon(
+                          Icons.lock_person_outlined, // Ícone representando segurança/usuário
+                          size: 100,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      
+                      // Texto de Destaque
+                      Text(
+                        'Recuperação de Acesso',
+                        style: GoogleFonts.poppins(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Subtítulo explicativo
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 60),
+                        child: Text(
+                          'Verifique sua caixa de entrada após o envio.\nSegurança e simplicidade para você retomar o controle.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: Colors.white.withOpacity(0.8),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
         ],
       ),

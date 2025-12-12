@@ -13,8 +13,6 @@ import '../comum/widget_carregamento.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart';
 
-/// Caso de uso para o Widgetbook.
-/// Simula a aba de dicas de uma disciplina genérica.
 @UseCase(
   name: 'Aba de Dicas (Aluno)',
   type: AbaDicasAluno,
@@ -30,10 +28,6 @@ Widget buildAbaDicasAluno(BuildContext context) {
   );
 }
 
-/// Tela que exibe e permite postar dicas sobre uma disciplina específica.
-/// 
-/// As dicas são compartilhadas globalmente com base no nome da disciplina.
-/// Ex: Uma dica postada na turma de "Cálculo 1" de 2023 aparecerá para a turma de 2024.
 class AbaDicasAluno extends ConsumerStatefulWidget {
   final String turmaId;
   final String nomeDisciplina;
@@ -58,59 +52,58 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
     super.dispose();
   }
 
-  /// Normaliza o nome da disciplina para agrupar dicas.
-  /// Ex: "Cálculo 1 - Turma A" -> "Cálculo 1"
   String _getNomeBase(String nome) {
-    // Remove números e letras soltas do final se houver padrão de turma
-    // Mas mantém números importantes como "Cálculo 1"
-    // Aqui usamos uma lógica simples: usa o nome como está ou remove sufixos
-    // Para este MVP, vamos assumir que o nome da disciplina já vem limpo ou usamos ele todo.
     return nome.trim(); 
   }
 
-  /// Envia a dica para o Firestore.
   Future<void> _postarDica() async {
     if (_dicaController.text.isEmpty) return;
 
-    final alunoUid = ref.read(provedorNotificadorAutenticacao).usuario?.uid;
+    final t = AppLocalizations.of(context)!;
+    
+    final usuario = ref.read(provedorNotificadorAutenticacao).usuario;
+    final alunoUid = usuario?.uid;
+    
     if (alunoUid == null) {
        ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text('Erro: Usuário não autenticado.'), backgroundColor: Colors.red)
+         SnackBar(content: Text(t.t('erro_generico')), backgroundColor: Colors.red)
        );
        return;
     }
 
     setState(() => _isLoading = true);
-    final t = AppLocalizations.of(context)!;
     
     final nomeBase = _getNomeBase(widget.nomeDisciplina);
+    final nomeAutor = usuario?.alunoInfo?.nomeCompleto.split(' ').first ?? 'Anônimo';
 
     final novaDica = DicaAluno(
-      id: '', // Gerado pelo Firestore
+      id: '', 
       texto: _dicaController.text,
       alunoId: alunoUid,
+      autorNome: nomeAutor,
+      materia: nomeBase,
       dataPostagem: DateTime.now(),
-      nomeBaseDisciplina: nomeBase, // Importante para a busca global
+      nomeBaseDisciplina: nomeBase, 
     );
 
     try {
-      await ref.read(servicoFirestoreProvider).adicionarDica(widget.turmaId, novaDica, nomeBase);
+      // CORRIGIDO: Passando apenas os 2 argumentos necessários (conforme atualizado no service)
+      await ref.read(servicoFirestoreProvider).adicionarDica(widget.turmaId, novaDica);
       
       _dicaController.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(t.t('dicas_postar_sucesso')), // "Dica postada!"
+            content: Text(t.t('dicas_postar_sucesso')), 
             backgroundColor: Colors.green,
           ),
         );
-        // Fecha o teclado
         FocusScope.of(context).unfocus();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao postar: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('${t.t('erro_generico')}: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -125,13 +118,11 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
     final t = AppLocalizations.of(context)!;
     final nomeBase = _getNomeBase(widget.nomeDisciplina);
     
-    // Busca dicas globais para esta disciplina
     final streamDicas = ref.watch(streamDicasPorNomeProvider(nomeBase));
     final theme = Theme.of(context);
 
     return Column(
       children: [
-        // 1. Área de Postagem
         Card(
           margin: const EdgeInsets.all(16.0),
           elevation: 2,
@@ -141,19 +132,19 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  t.t('dicas_titulo'), // "Dicas para Próximos Alunos"
+                  t.t('dicas_titulo'), 
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  t.t('dicas_subtitulo'), // "Deixe uma dica anônima..."
+                  t.t('dicas_subtitulo'), 
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _dicaController,
                   decoration: InputDecoration(
-                    hintText: t.t('dicas_placeholder'), // "Escreva aqui..."
+                    hintText: t.t('dicas_placeholder'),
                     border: const OutlineInputBorder(),
                     filled: true,
                   ),
@@ -165,7 +156,7 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
                   icon: _isLoading
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.send_outlined, size: 18),
-                  label: Text(_isLoading ? t.t('carregando') : t.t('dicas_postar_botao')),
+                  label: Text(_isLoading ? t.t('carregando') : t.t('dicas_postar_botao')), 
                   onPressed: _isLoading ? null : _postarDica,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.primary,
@@ -177,12 +168,10 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
           ),
         ),
 
-        // 2. Lista de Dicas
         Expanded(
           child: streamDicas.when(
             loading: () => const WidgetCarregamento(),
             error: (err, st) {
-               // Tratamento para o erro de índice do Firebase
                if (err.toString().contains("failed-precondition")) {
                   return Center(child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -197,7 +186,7 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Text(
-                      t.t('dicas_vazio'), // "Nenhuma dica encontrada."
+                      t.t('dicas_vazio'),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6)),
                     ),
@@ -215,9 +204,19 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
                     child: ListTile(
                       leading: const Icon(Icons.lightbulb_outline, color: Colors.orange),
                       title: Text(dica.texto),
-                      subtitle: Text(
-                        DateFormat('dd/MM/yyyy').format(dica.dataPostagem),
-                        style: const TextStyle(fontSize: 12),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(dica.dataPostagem), 
+                            style: const TextStyle(fontSize: 12)
+                          ),
+                          Text(
+                            "por: ${dica.autorNome}",
+                            style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: theme.textTheme.bodySmall?.color?.withOpacity(0.7)),
+                          ),
+                        ],
                       ),
                     ),
                   );

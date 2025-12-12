@@ -9,7 +9,6 @@ import '../models/turma_professor.dart';
 import '../models/solicitacao_aluno.dart';
 import '../models/disciplina_notas.dart';
 import '../models/prova_agendada.dart';
-import '../models/evento_ca.dart';
 
 // ===========================================================================
 // 👨‍🏫 SEÇÃO 1: PROVEDORES DO PROFESSOR
@@ -132,10 +131,3 @@ final provedorStreamCalendario = StreamProvider<List<ProvaAgendada>>((ref) {
   return servico.getCalendarioDeProvas();
 });
 
-/// Escuta os **Eventos do C.A.** (Centro Acadêmico).
-///
-/// Usado para mostrar palestras, festas e avisos na timeline.
-final provedorStreamEventosCA = StreamProvider<List<EventoCA>>((ref) {
-  final servico = ref.watch(servicoFirestoreProvider);
-  return servico.getEventos();
-});

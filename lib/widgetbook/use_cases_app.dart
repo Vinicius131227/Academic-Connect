@@ -24,11 +24,7 @@ import '../telas/professor/tela_detalhes_disciplina_prof.dart';
 import '../telas/professor/tela_criar_turma.dart';
 import '../telas/professor/tela_calendario_professor.dart';
 
-// --- Telas C.A. ---
-import '../telas/ca_projeto/aba_inicio_ca.dart';
-import '../telas/ca_projeto/aba_eventos_ca.dart';
-import '../telas/ca_projeto/aba_perfil_ca.dart';
-import '../telas/ca_projeto/tela_criar_evento.dart';
+
 
 // --- Comum ---
 import '../telas/comum/tela_configuracoes.dart';
@@ -151,30 +147,7 @@ List<WidgetbookComponent> get appUseCases => [
     ],
   ),
 
-  // ===========================================================================
-  // CENTRO ACADÊMICO
-  // ===========================================================================
-  WidgetbookComponent(
-    name: 'C.A. - Principal',
-    useCases: [
-      WidgetbookUseCase(
-        name: 'Dashboard (Home)',
-        builder: (context) => const ProviderScope(child: AbaInicioCA()),
-      ),
-      WidgetbookUseCase(
-        name: 'Lista de Eventos',
-        builder: (context) => const ProviderScope(child: AbaEventosCA()),
-      ),
-      WidgetbookUseCase(
-        name: 'Perfil Gestão',
-        builder: (context) => const ProviderScope(child: AbaPerfilCA()),
-      ),
-      WidgetbookUseCase(
-        name: 'Criar Evento',
-        builder: (context) => const ProviderScope(child: TelaCriarEvento()),
-      ),
-    ],
-  ),
+  // ====================================
 
   // ===========================================================================
   // COMUM

@@ -1,9 +1,10 @@
-// lib/telas/autenticacao/tela_cadastro_usuario.dart
+// lib/telas/login/tela_cadastro_usuario.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
 // Importações internas
 import '../../providers/provedor_autenticacao.dart';
@@ -12,6 +13,17 @@ import '../../l10n/app_localizations.dart';
 import '../comum/overlay_carregamento.dart';
 import '../../themes/app_theme.dart';
 import 'portao_autenticacao.dart';
+
+/// Caso de uso para o Widgetbook.
+@UseCase(
+  name: 'Cadastro de Usuário',
+  type: TelaCadastroUsuario,
+)
+Widget buildTelaCadastro(BuildContext context) {
+  return const ProviderScope(
+    child: TelaCadastroUsuario(),
+  );
+}
 
 class TelaCadastroUsuario extends ConsumerStatefulWidget {
   final bool isInitialSetup;
@@ -42,10 +54,13 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   final _dataNascimentoController = TextEditingController();
 
   DateTime? _dataNascimento;
-  
   // ignore: unused_field
   String? _universidadeSelecionada = 'UFSCar - Campus Sorocaba';
   
+  // Removido dropdown de tipo ID (agora só campo texto)
+  String? _tipoIdentificacao; 
+  final List<String> _opcoesIdentificacao = ['Matrícula', 'SIAPE', 'Outro'];
+
   @override
   void initState() {
     super.initState();
@@ -87,18 +102,18 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   }
 
   Future<void> _submit() async {
-    final t = AppLocalizations.of(context)!;
-
     if (!_formKey.currentState!.validate()) return;
     
+    // Validação específica para aluno
     if (_papelSelecionado == 'aluno' && _dataNascimento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.t('erro_data_nascimento')), backgroundColor: Colors.redAccent)
+        const SnackBar(content: Text('Data de nascimento obrigatória'), backgroundColor: Colors.redAccent)
       );
       return;
     }
 
     ref.read(provedorCarregando.notifier).state = true;
+    final t = AppLocalizations.of(context)!;
 
     try {
       if (widget.isInitialSetup) {
@@ -114,8 +129,12 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
           await ref.read(provedorNotificadorAutenticacao.notifier).salvarPerfilAluno(info);
           await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel('aluno');
         } else {
-          // Professor
-          await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel(_papelSelecionado, tipoIdentificacao: 'N/A', numIdentificacao: _raOuIdController.text.trim());
+          // Professor / CA
+          await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel(
+            _papelSelecionado, 
+            tipoIdentificacao: _tipoIdentificacao ?? 'N/A',
+            numIdentificacao: _raOuIdController.text.trim()
+          );
         }
       } else {
         if (_papelSelecionado == 'aluno') {
@@ -128,29 +147,37 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
             dataNascimento: _dataNascimento!,
           );
         } else {
-          // Professor
           await ref.read(provedorNotificadorAutenticacao.notifier).signUpComIdentificacao(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
             papel: _papelSelecionado,
             nomeCompleto: _nomeController.text.trim(),
             identificacao: _raOuIdController.text.trim(),
-            tipoIdentificacao: 'N/A',
+            tipoIdentificacao: _tipoIdentificacao ?? 'N/A',
           );
         }
       }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.t('cadastro_sucesso')), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.t('cadastro_sucesso')), backgroundColor: Colors.green)
+        );
+        
         if (!widget.isInitialSetup) {
-             Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), (route) => false);
+             Navigator.of(context).pushAndRemoveUntil(
+               MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), 
+               (route) => false
+             );
         } else {
              Navigator.pop(context);
         }
       }
+
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red)
+        );
       }
     } finally {
       if (mounted) ref.read(provedorCarregando.notifier).state = false;
@@ -174,14 +201,19 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black87;
+    
     final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
     final Color fillColor = isDark ? AppColors.surfaceDark : Colors.white;
     final Color dropdownColor = isDark ? AppColors.surfaceDark : Colors.white;
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
 
+    // Listener de segurança
     ref.listen(provedorNotificadorAutenticacao, (previous, next) {
        if (next.status == StatusAutenticacao.autenticado && !widget.isInitialSetup) {
-           Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), (route) => false);
+           Navigator.of(context).pushAndRemoveUntil(
+             MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), 
+             (route) => false
+           );
        }
     });
 
@@ -195,6 +227,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
       ),
       body: Row(
         children: [
+          // --- LADO ESQUERDO: FORMULÁRIO ---
           Expanded(
             flex: 4,
             child: Center(
@@ -210,12 +243,11 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         Text(t.t('cadastro_subtitulo'), style: GoogleFonts.poppins(fontSize: 14, color: subTextColor), textAlign: TextAlign.center),
                         const SizedBox(height: 30),
 
-                        // Dropdown Universidade
                         _buildStyledDropdown(
-                          context, // Passando context para traduções internas se precisar
+                          context,
                           label: t.t('cadastro_universidade'),
                           value: 'UFSCar - Campus Sorocaba',
-                          items: const ['UFSCar - Campus Sorocaba'], // No futuro, usar AppLocalizations.universidades
+                          items: const ['UFSCar - Campus Sorocaba'],
                           onChanged: null,
                           textColor: textColor,
                           subTextColor: subTextColor,
@@ -224,13 +256,12 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Dropdown Perfil (Aluno/Professor)
                         _buildStyledDropdown(
                           context,
                           label: t.t('cadastro_papel_label'),
                           value: _papelSelecionado,
-                          items: ['aluno', 'professor'],
-                          displayItems: [t.t('papel_aluno'), t.t('papel_professor')],
+                          items: ['aluno', 'professor', 'ca_projeto'],
+                          displayItems: [t.t('papel_aluno'), t.t('papel_professor'), t.t('papel_ca')],
                           onChanged: estaCarregando ? null : (v) {
                             if (v != null) {
                               setState(() {
@@ -239,6 +270,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                                 _cursoController.clear();
                                 _dataNascimento = null;
                                 _dataNascimentoController.clear();
+                                _tipoIdentificacao = null;
                               });
                             }
                           },
@@ -249,40 +281,34 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         ),
                         const SizedBox(height: 20),
 
-                        // Nome
-                        _buildStyledTextField(context, controller: _nomeController, label: t.t('cadastro_nome_label'), hint: 'John Doe', enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
+                        _buildStyledTextField(
+                          context, 
+                          controller: _nomeController, 
+                          label: t.t('cadastro_nome_label'), 
+                          hint: 'John Doe', 
+                          enabled: !estaCarregando, 
+                          textColor: textColor, 
+                          subTextColor: subTextColor, 
+                          fillColor: fillColor
+                        ),
                         const SizedBox(height: 20),
 
                         if (!widget.isInitialSetup) ...[
-                          // Email
                           _buildStyledTextField(context, controller: _emailController, label: t.t('login_email'), hint: 'user@email.com', enabled: !estaCarregando, inputType: TextInputType.emailAddress, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
-                          
-                          // Senha
-                          _buildStyledTextField(context, controller: _passwordController, label: t.t('login_senha'), hint: '••••••••', isObscure: true, enabled: !estaCarregando, 
-                            validator: (v) => (v == null || v.length < 6) ? t.t('dica_senha_curta') : null, 
-                            textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
+                          _buildStyledTextField(context, controller: _passwordController, label: t.t('login_senha'), hint: '••••••••', isObscure: true, enabled: !estaCarregando, validator: (v) => (v == null || v.length < 6) ? t.t('dica_senha_curta') : null, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
-                          
-                          // Confirmar Senha (AQUI ESTAVA O PROBLEMA)
-                          _buildStyledTextField(context, 
-                            controller: _confirmPasswordController, 
-                            label: t.t('cadastro_confirmar_senha'), // Agora traduzido corretamente
-                            hint: '••••••••', 
-                            isObscure: true, 
-                            enabled: !estaCarregando, 
-                            validator: (v) => (v != _passwordController.text) ? t.t('cadastro_erro_senha') : null, 
-                            textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
+                          _buildStyledTextField(context, controller: _confirmPasswordController, label: t.t('cadastro_confirmar_senha'), hint: '••••••••', isObscure: true, enabled: !estaCarregando, validator: (v) => (v != _passwordController.text) ? t.t('cadastro_erro_senha') : null, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
                         ],
 
                         if (_papelSelecionado == 'aluno') ...[
-                          // Curso
                           _buildStyledDropdown(
                             context,
                             label: t.t('cadastro_curso'),
                             value: _cursoController.text.isEmpty ? null : _cursoController.text,
-                            items: AppLocalizations.of(context)!.cursos, // Usa a lista traduzida
+                            // CORRECTION: Use `t.cursos` (instance member) instead of `AppLocalizations.cursos` (static member)
+                            items: t.cursos, 
                             onChanged: estaCarregando ? null : (v) { if (v != null) setState(() => _cursoController.text = v); },
                             textColor: textColor,
                             subTextColor: subTextColor,
@@ -290,19 +316,24 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                             dropdownColor: dropdownColor,
                           ),
                           const SizedBox(height: 20),
-                          
-                          // RA
                           _buildStyledTextField(context, controller: _raOuIdController, label: t.t('cadastro_ra_label'), hint: '123456', inputType: TextInputType.number, enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
-                          
-                          // Data de Nascimento
                           GestureDetector(
                             onTap: estaCarregando ? null : _selecionarDataNascimento,
                             child: AbsorbPointer(child: _buildStyledTextField(context, controller: _dataNascimentoController, label: t.t('cadastro_data_nasc_label'), hint: 'dd/mm/aaaa', suffixIcon: Icon(Icons.calendar_today, color: subTextColor, size: 18), textColor: textColor, subTextColor: subTextColor, fillColor: fillColor)),
                           ),
                         ] else ...[
-                           // Professor
-                           _buildStyledTextField(context, controller: _raOuIdController, label: t.t('cadastro_num_prof'), hint: '123456', enabled: !estaCarregando, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
+                           // Para Prof/CA: Identificação Genérica
+                           _buildStyledTextField(
+                             context, 
+                             controller: _raOuIdController, 
+                             label: t.t('cadastro_num_prof'), // "Número de Identificação"
+                             hint: '123456', 
+                             enabled: !estaCarregando, 
+                             textColor: textColor, 
+                             subTextColor: subTextColor, 
+                             fillColor: fillColor
+                           ),
                         ],
 
                         const SizedBox(height: 40),
@@ -318,9 +349,9 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                           ),
                         ),
                         
+                        // Botão Google
                         if (!widget.isInitialSetup) ...[
                           const SizedBox(height: 24),
-                          // Botão Google
                           SizedBox(
                             width: double.infinity,
                             height: 50,
@@ -328,9 +359,14 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                               onPressed: estaCarregando ? null : _googleSignUp,
                               style: OutlinedButton.styleFrom(side: BorderSide(color: subTextColor.withOpacity(0.5)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), foregroundColor: textColor),
                               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Image.asset('assets/images/google_logo.png', height: 24), 
+                                Image.asset(
+                                  'assets/images/google_logo.png', 
+                                  height: 24,
+                                  // Fallback caso a imagem não carregue
+                                  errorBuilder: (c,e,s) => const Icon(Icons.g_mobiledata, size: 24),
+                                ), 
                                 const SizedBox(width: 12), 
-                                Text(t.t('login_google_btn'), style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500))
+                                Text(t.t('login_google_btn') ?? 'Google', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500))
                               ]),
                             ),
                           ),
@@ -342,13 +378,35 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
               ),
             ),
           ),
-          if (isDesktop) Expanded(flex: 5, child: Container(color: AppColors.primaryPurple)),
+          
+          // --- LADO DIREITO: ARTE (DESKTOP) ---
+          if (isDesktop)
+            Expanded(
+              flex: 5,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF8C52FF),
+                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF9D5CFF), Color(0xFF8C52FF)]),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Join the\nCommunity', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, height: 1.2)),
+                      const SizedBox(height: 40),
+                      ConstrainedBox(constraints: const BoxConstraints(maxWidth: 400, maxHeight: 400), child: const Icon(Icons.group_add_rounded, size: 200, color: Colors.white24)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  // WIDGET HELPER ATUALIZADO COM TRADUÇÕES
+  // --- WIDGETS AUXILIARES COM TRADUÇÃO E ESTILO ---
+
   Widget _buildStyledTextField(BuildContext context, {required TextEditingController controller, required String label, String hint = '', bool isObscure = false, bool enabled = true, TextInputType? inputType, Widget? suffixIcon, String? Function(String?)? validator, required Color textColor, required Color subTextColor, required Color fillColor}) {
     final t = AppLocalizations.of(context)!;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -359,10 +417,19 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
         obscureText: isObscure, 
         keyboardType: inputType, 
         enabled: enabled, 
-        style: TextStyle(color: textColor), 
-        // VALIDAÇÃO PADRÃO CORRIGIDA:
-        validator: validator ?? (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null, 
-        decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: subTextColor.withOpacity(0.5)), filled: true, fillColor: fillColor, contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)), errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent)), suffixIcon: suffixIcon)
+        style: TextStyle(color: textColor),
+        validator: validator ?? (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') ?? 'Obrigatório' : null,
+        decoration: InputDecoration(
+          hintText: hint, 
+          hintStyle: TextStyle(color: subTextColor.withOpacity(0.5)),
+          filled: true, 
+          fillColor: fillColor,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))),
+          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)),
+          errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent)),
+          suffixIcon: suffixIcon
+        ),
       ),
     ]);
   }
@@ -373,15 +440,21 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
       Text(label, style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500)),
       const SizedBox(height: 8),
       DropdownButtonFormField<String>(
-        value: value, 
-        items: List.generate(items.length, (index) => DropdownMenuItem(value: items[index], child: Text(displayItems != null ? displayItems[index] : items[index], style: TextStyle(color: textColor)))), 
-        onChanged: onChanged, 
-        dropdownColor: dropdownColor, 
-        style: TextStyle(color: textColor), 
-        iconEnabledColor: subTextColor, 
-        decoration: InputDecoration(filled: true, fillColor: fillColor, contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))), focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)), errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent))), 
-        // VALIDAÇÃO PADRÃO CORRIGIDA:
-        validator: (v) => v == null ? t.t('campo_obrigatorio') : null
+        value: value,
+        items: List.generate(items.length, (index) => DropdownMenuItem(value: items[index], child: Text(displayItems != null ? displayItems[index] : items[index], style: TextStyle(color: textColor)))),
+        onChanged: onChanged,
+        dropdownColor: dropdownColor,
+        style: TextStyle(color: textColor),
+        iconEnabledColor: subTextColor,
+        decoration: InputDecoration(
+          filled: true, 
+          fillColor: fillColor, 
+          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16), 
+          enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: subTextColor.withOpacity(0.3))), 
+          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: AppColors.primaryPurple)), 
+          errorBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent))
+        ),
+        validator: (v) => v == null ? t.t('campo_obrigatorio') ?? 'Obrigatório' : null
       ),
     ]);
   }

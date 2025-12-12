@@ -1,128 +1,127 @@
-// lib/telas/professor/tela_visualizar_alunos.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../models/aluno_chamada.dart';
 import '../../services/servico_firestore.dart';
 import '../../l10n/app_localizations.dart';
-import '../../themes/app_theme.dart';
 import '../comum/widget_carregamento.dart';
+import '../../themes/app_theme.dart';
 
-/// Caso de uso para o Widgetbook.
-/// Simula a tela de visualização de alunos de uma turma.
-@UseCase(
-  name: 'Visualizar Alunos',
-  type: TelaVisualizarAlunos,
-)
+@UseCase(name: 'Ver Alunos', type: TelaVisualizarAlunos)
 Widget buildTelaVisualizarAlunos(BuildContext context) {
-  return ProviderScope(
-    child: TelaVisualizarAlunos(
-      turma: TurmaProfessor(
-        id: 'mock_id',
-        nome: 'Física 1',
-        horario: 'Seg 08:00',
-        local: 'Sala 10',
-        professorId: 'prof_id',
-        turmaCode: 'A1B2C3',
-        creditos: 4,
-        alunosInscritos: [],
-      ),
-    ),
-  );
+  return const ProviderScope(child: Scaffold(body: Center(child: Text("Mock"))));
 }
 
-/// Provedor que busca a lista de alunos de uma turma específica.
-final alunosTurmaProvider = FutureProvider.family<List<AlunoChamada>, String>((ref, turmaId) async {
-  return ref.read(servicoFirestoreProvider).getAlunosDaTurma(turmaId);
+// Provider para buscar a lista combinada (Reais + Pré-cadastrados)
+final listaAlunosProvider = FutureProvider.family<List<AlunoChamada>, String>((ref, turmaId) {
+  return ref.watch(servicoFirestoreProvider).getAlunosDaTurma(turmaId);
 });
 
-/// Tela que exibe a lista de alunos inscritos na disciplina.
-/// Permite ao professor ter uma visão geral da classe.
 class TelaVisualizarAlunos extends ConsumerWidget {
   final TurmaProfessor turma;
-  
   const TelaVisualizarAlunos({super.key, required this.turma});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    
-    // Busca os dados
-    final asyncAlunos = ref.watch(alunosTurmaProvider(turma.id));
-    
-    // Tema
+    final asyncAlunos = ref.watch(listaAlunosProvider(turma.id));
     final theme = Theme.of(context);
-    final textColor = theme.textTheme.bodyLarge?.color;
     final isDark = theme.brightness == Brightness.dark;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          t.t('prof_ver_alunos'), // "Ver Alunos"
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
-        ),
+        title: Text(t.t('prof_ver_alunos'), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+        iconTheme: IconThemeData(color: theme.textTheme.bodyLarge?.color),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: textColor),
       ),
       body: asyncAlunos.when(
-        loading: () => const WidgetCarregamento(texto: "Carregando lista..."),
+        loading: () => const WidgetCarregamento(),
         error: (e, s) => Center(child: Text("${t.t('erro_generico')}: $e")),
         data: (alunos) {
           if (alunos.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people_outline, size: 64, color: Colors.grey.withOpacity(0.5)),
-                  const SizedBox(height: 16),
-                  Text(
-                    "Nenhum aluno inscrito nesta turma.", // Fallback se não houver tradução específica
-                    style: TextStyle(color: textColor?.withOpacity(0.6)),
-                  ),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    "${t.t('criar_turma_codigo_desc')} ${turma.turmaCode}",
-                    style: TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            );
+            return const Center(child: Text("Nenhum aluno nesta turma."));
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: alunos.length,
-            itemBuilder: (context, index) {
-              final aluno = alunos[index];
-              return Card(
-                color: cardColor,
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primaryPurple.withOpacity(0.1),
-                    child: Text(
-                      aluno.nome.isNotEmpty ? aluno.nome[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppColors.primaryPurple, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  title: Text(aluno.nome, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
-                  subtitle: Text("${t.t('cadastro_ra_label')}: ${aluno.ra}", style: TextStyle(color: textColor?.withOpacity(0.7))),
+          // Separa contagem para exibir no topo
+          // O ID dos alunos da planilha começa com "pre_" (definimos isso no serviço)
+          final total = alunos.length;
+          final pendentes = alunos.where((a) => a.id.startsWith('pre_')).length;
+
+          return Column(
+            children: [
+              // Painel de Estatísticas
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildCounter("Total", total.toString(), Colors.blue),
+                    _buildCounter("Ativos", (total - pendentes).toString(), Colors.green),
+                    _buildCounter("Pendentes", pendentes.toString(), Colors.orange),
+                  ],
                 ),
-              );
-            },
+              ),
+              const Divider(),
+              
+              // Lista de Alunos
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: alunos.length,
+                  itemBuilder: (context, index) {
+                    final aluno = alunos[index];
+                    final isPendente = aluno.id.startsWith('pre_');
+
+                    return Card(
+                      color: cardColor,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isPendente ? Colors.orange.withOpacity(0.2) : AppColors.primaryPurple.withOpacity(0.2),
+                          child: Icon(
+                            isPendente ? Icons.hourglass_empty : Icons.check_circle, 
+                            color: isPendente ? Colors.orange : AppColors.primaryPurple,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(aluno.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          isPendente ? t.t('prof_aluno_pendente') : "${t.t('prof_aluno_regular')} • ${aluno.ra}",
+                          style: TextStyle(
+                            color: isPendente ? Colors.orange : null,
+                            fontSize: 12
+                          ),
+                        ),
+                        // Se for pendente, mostra ícone de alerta
+                        trailing: isPendente 
+                          ? Tooltip(
+                              message: "Aluno importado, aguardando cadastro no App",
+                              child: Icon(Icons.info_outline, color: Colors.orange.withOpacity(0.5)),
+                            )
+                          : null,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildCounter(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      ],
     );
   }
 }

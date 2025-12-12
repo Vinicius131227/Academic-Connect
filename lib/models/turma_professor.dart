@@ -1,16 +1,15 @@
-// lib/models/turma_professor.dart
-
-/// Representa uma disciplina/turma criada por um professor.
 class TurmaProfessor {
-  final String id; // ID do documento no Firestore
+  final String id;
   final String nome;
-  final String horario; // Texto formatado "Seg 08:00-10:00"
+  final String horario;
   final String local;
   final String professorId;
-  final String turmaCode; // Código único para alunos entrarem
-  final int creditos; // 2 ou 4
-  final List<String> alunosInscritos; // Lista de UIDs dos alunos
-  final String? linkConvite; // Deep link para entrar
+  final String turmaCode;
+  final int creditos;
+  final List<String> alunosInscritos; // UIDs de quem já tem conta
+  
+  // NOVO: Lista de mapas [{'nome': 'João', 'email': 'joao@email.com'}]
+  final List<Map<String, dynamic>> alunosPreCadastrados; 
 
   TurmaProfessor({
     required this.id,
@@ -21,7 +20,7 @@ class TurmaProfessor {
     required this.turmaCode,
     required this.creditos,
     required this.alunosInscritos,
-    this.linkConvite,
+    this.alunosPreCadastrados = const [], // Padrão vazio
   });
 
   Map<String, dynamic> toMap() {
@@ -33,21 +32,22 @@ class TurmaProfessor {
       'turmaCode': turmaCode,
       'creditos': creditos,
       'alunosInscritos': alunosInscritos,
-      'linkConvite': linkConvite,
+      'alunosPreCadastrados': alunosPreCadastrados, // Salva no banco
     };
   }
 
   factory TurmaProfessor.fromMap(Map<String, dynamic> map, String id) {
     return TurmaProfessor(
       id: id,
-      nome: map['nome'] ?? 'Sem Nome',
+      nome: map['nome'] ?? '',
       horario: map['horario'] ?? '',
       local: map['local'] ?? '',
       professorId: map['professorId'] ?? '',
       turmaCode: map['turmaCode'] ?? '',
       creditos: map['creditos'] ?? 4,
       alunosInscritos: List<String>.from(map['alunosInscritos'] ?? []),
-      linkConvite: map['linkConvite'],
+      // Carrega a lista de pré-cadastrados
+      alunosPreCadastrados: List<Map<String, dynamic>>.from(map['alunosPreCadastrados'] ?? []),
     );
   }
 }

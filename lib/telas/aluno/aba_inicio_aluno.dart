@@ -8,17 +8,18 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
+// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart'; 
+import '../../providers/provedor_mapas.dart'; // IMPORTANTE: Mapas
 import '../../models/prova_agendada.dart'; 
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 import '../comum/animacao_fadein_lista.dart'; 
 import '../comum/widget_carregamento.dart';
 
-import 'tela_notas_avaliacoes.dart';
+// Telas de navegação
 import 'tela_solicitar_adaptacao.dart';
-import 'tela_cadastro_nfc.dart';
 import 'tela_drive_provas.dart'; 
 import 'tela_dicas_gerais.dart'; 
 import 'tela_calendario.dart';   
@@ -52,23 +53,110 @@ class AbaInicioAluno extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
+    
+    // Providers de dados
+    final asyncTurmas = ref.watch(provedorStreamTurmasAluno);
     final asyncProvas = ref.watch(provedorStreamCalendario); 
+    final servicoMapas = ref.read(provedorMapas); // Serviço de Mapas
+    
     final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
     final asyncQuote = ref.watch(quoteProvider);
 
     final nomeAluno = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Aluno';
 
+    // Tema
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
 
+    // --- FUNÇÃO PARA MOSTRAR DETALHES DA PROVA ---
+    void _mostrarDetalhesProva(ProvaAgendada prova) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: cardColor,
+          title: Row(
+            children: [
+              const Icon(Icons.assignment_late, color: AppColors.primaryPurple),
+              const SizedBox(width: 12),
+              Expanded(child: Text(prova.titulo, style: TextStyle(color: textColor))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Matéria
+              Text(prova.disciplina, style: TextStyle(color: subTextColor, fontSize: 14, fontWeight: FontWeight.bold)),
+              const Divider(height: 24),
+              
+              // Data e Hora
+              _buildDetailRow(
+                Icons.access_time, 
+                "Data e Hora", 
+                DateFormat("dd/MM/yyyy 'às' HH:mm").format(prova.dataHora), 
+                textColor, subTextColor
+              ),
+              const SizedBox(height: 16),
+
+              // Conteúdo
+              _buildDetailRow(
+                Icons.menu_book, 
+                "Conteúdo", 
+                prova.conteudo.isEmpty ? "Não informado" : prova.conteudo, 
+                textColor, subTextColor
+              ),
+              const SizedBox(height: 16),
+
+              // Localização com Ação de Mapa
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.location_on, size: 20, color: subTextColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Local", style: TextStyle(color: subTextColor, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text("${prova.predio} - ${prova.sala}", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  // Botão MAPA
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pop(ctx); // Fecha o dialog
+                      // Chama o serviço de mapas com o nome do prédio
+                      servicoMapas.abrirLocalizacao(prova.predio).catchError((e) {
+                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                      });
+                    },
+                    icon: const Icon(Icons.map, color: AppColors.primaryPurple),
+                    tooltip: t.t('aluno_detalhes_ver_mapa'),
+                  )
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(t.t('fechar'), style: const TextStyle(color: AppColors.primaryPurple)),
+            )
+          ],
+        ),
+      );
+    }
+
     void _abrirDriveGlobal() {
-         Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDriveProvas()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDriveProvas()));
     }
     void _abrirDicasGerais() {
-         Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDicasGerais()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDicasGerais()));
     }
 
     final widgets = [
@@ -145,29 +233,51 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 32),
 
-      // 4. PRÓXIMAS AVALIAÇÕES
+      // 4. PRÓXIMAS AVALIAÇÕES (COM CLIQUE)
       Text(
         t.t('inicio_proximas_avaliacoes'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
       ),
       const SizedBox(height: 16),
 
-      asyncProvas.when(
+      asyncTurmas.when(
         loading: () => const WidgetCarregamento(texto: ''),
-        error: (e,s) => const SizedBox.shrink(),
-        data: (provas) {
-          if (provas.isEmpty) {
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
-              child: Center(child: Text(t.t('inicio_sem_provas'), style: TextStyle(color: subTextColor))),
-            );
-          }
-          return Column(
-            children: provas.take(3).map((prova) => 
-              _buildResultCard(prova, cardColor, textColor, subTextColor)
-            ).toList()
+        error: (_,__) => const SizedBox.shrink(),
+        data: (turmas) {
+          
+          final meusIds = turmas.map((t) => t.id).toSet();
+
+          return asyncProvas.when(
+            loading: () => const WidgetCarregamento(texto: ''),
+            error: (e,s) => const SizedBox.shrink(),
+            data: (todasProvas) {
+              
+              final minhasProvas = todasProvas.where((p) {
+                 return meusIds.contains(p.turmaId) && 
+                        p.dataHora.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+              }).toList();
+
+              minhasProvas.sort((a,b) => a.dataHora.compareTo(b.dataHora));
+              
+              if (minhasProvas.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                  child: Center(child: Text(t.t('inicio_sem_provas'), style: TextStyle(color: subTextColor))),
+                );
+              }
+              
+              return Column(
+                children: minhasProvas.take(3).map((prova) => 
+                  // Adicionado GestureDetector para clique
+                  GestureDetector(
+                    onTap: () => _mostrarDetalhesProva(prova),
+                    child: _buildResultCard(prova, cardColor, textColor, subTextColor)
+                  )
+                ).toList()
+              );
+            }
           );
         }
       ),
@@ -199,13 +309,23 @@ class AbaInicioAluno extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusItem({required IconData icon, required String value, required String label}) {
-    return Column(
+  // Helper para linhas de detalhe no Dialog
+  Widget _buildDetailRow(IconData icon, String label, String value, Color textColor, Color subTextColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: Colors.white, size: 28),
-        const SizedBox(height: 8),
-        Text(value, style: GoogleFonts.poppins(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(label, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+        Icon(icon, size: 20, color: subTextColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: subTextColor, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(value, style: TextStyle(color: textColor, fontSize: 16)),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -258,15 +378,12 @@ class AbaInicioAluno extends ConsumerWidget {
               children: [
                 Text(prova.disciplina, style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4), 
-                  child: LinearProgressIndicator(value: 0.7, color: AppColors.cardBlue, backgroundColor: subtitleColor.withOpacity(0.1), minHeight: 6)
-                ),
+                Text(prova.titulo, style: TextStyle(color: subtitleColor, fontSize: 12)),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          Text(DateFormat('MMM').format(prova.dataHora), style: TextStyle(color: subtitleColor, fontWeight: FontWeight.bold)),
+          Text(DateFormat('HH:mm').format(prova.dataHora), style: TextStyle(color: subtitleColor, fontWeight: FontWeight.bold)),
         ],
       ),
     );

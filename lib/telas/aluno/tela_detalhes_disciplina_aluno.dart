@@ -1,6 +1,7 @@
 // lib/telas/aluno/tela_detalhes_disciplina_aluno.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,10 +10,12 @@ import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
 // Importações internas
 import '../../models/turma_professor.dart';
-import '../../models/usuario.dart'; // Para o model do professor
+import '../../models/usuario.dart'; 
+import '../../models/prova_agendada.dart'; // Necessário para tipagem
 import '../../l10n/app_localizations.dart';
 import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
+import '../../providers/provedor_mapas.dart'; 
 import '../../services/servico_firestore.dart';
 import '../comum/widget_carregamento.dart';
 import '../../themes/app_theme.dart';
@@ -21,7 +24,6 @@ import '../../themes/app_theme.dart';
 import '../comum/aba_chat_disciplina.dart';
 import 'aba_materiais_aluno.dart';
 
-/// Caso de uso para o Widgetbook.
 @UseCase(
   name: 'Detalhes Disciplina (Aluno)',
   type: TelaDetalhesDisciplinaAluno,
@@ -33,7 +35,7 @@ Widget buildTelaDetalhesDisciplina(BuildContext context) {
         id: 'mock_id',
         nome: 'Cálculo 1',
         horario: 'Seg 08:00-10:00',
-        local: 'AT1 101',
+        local: 'AT1 - 101',
         professorId: 'prof_id',
         turmaCode: 'XYZ123',
         creditos: 4,
@@ -43,47 +45,119 @@ Widget buildTelaDetalhesDisciplina(BuildContext context) {
   );
 }
 
-/// Provedor auxiliar para buscar os dados do professor pelo ID.
 final professorProvider = FutureProvider.family<UsuarioApp?, String>((ref, professorId) async {
   return ref.read(servicoFirestoreProvider).getUsuario(professorId);
 });
 
-/// Provedor auxiliar para monitorar as aulas da turma (para calcular frequência).
 final aulasTurmaProvider = StreamProvider.family<QuerySnapshot, String>((ref, turmaId) {
   return ref.read(servicoFirestoreProvider).getAulasStream(turmaId);
 });
 
-/// Tela principal de detalhes de uma disciplina para o aluno (Hub).
 class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
   final TurmaProfessor turma;
-  
-  const TelaDetalhesDisciplinaAluno({
-    super.key, 
-    required this.turma
-  });
+  const TelaDetalhesDisciplinaAluno({super.key, required this.turma});
+
+  String _extrairNomePredio(String localCompleto) {
+    if (localCompleto.contains('-')) {
+      return localCompleto.split('-')[0].trim();
+    }
+    return localCompleto.trim();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    
-    // Obtém o ID do aluno logado para filtrar notas e frequência
     final alunoUid = ref.watch(provedorNotificadorAutenticacao).usuario?.uid;
     
-    // Streams de dados em tempo real
     final asyncNotas = ref.watch(provedorStreamNotasAluno);
     final asyncProvas = ref.watch(provedorStreamCalendario);
     final asyncProfessor = ref.watch(professorProvider(turma.professorId));
     final asyncAulas = ref.watch(aulasTurmaProvider(turma.id));
 
-    // Configurações de Tema
+    final servicoMapas = ref.read(provedorMapas);
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.textTheme.bodyLarge?.color;
-    final cardColor = isDark ? AppColors.surfaceDark : Colors.white; // Força branco no light
+    final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
     final subTextColor = isDark ? Colors.white70 : Colors.black54;
-    
-    // Usa a cor de fundo do scaffold definida no tema
     final bgColor = theme.scaffoldBackgroundColor; 
+
+    // --- FUNÇÃO PARA MOSTRAR DETALHES DA PROVA ---
+    void _mostrarDetalhesProva(ProvaAgendada prova) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: cardColor,
+          title: Row(
+            children: [
+              const Icon(Icons.assignment_late, color: AppColors.primaryPurple),
+              const SizedBox(width: 12),
+              Expanded(child: Text(prova.titulo, style: TextStyle(color: textColor))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Data e Hora
+              _buildDetailRow(
+                Icons.access_time, 
+                "Data e Hora", 
+                DateFormat("dd/MM/yyyy 'às' HH:mm").format(prova.dataHora), 
+                textColor, subTextColor
+              ),
+              const SizedBox(height: 16),
+
+              // Conteúdo
+              _buildDetailRow(
+                Icons.menu_book, 
+                "Conteúdo", 
+                prova.conteudo.isEmpty ? "Não informado" : prova.conteudo, 
+                textColor, subTextColor
+              ),
+              const SizedBox(height: 16),
+
+              // Localização com Ação de Mapa
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.location_on, size: 20, color: subTextColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Local", style: TextStyle(color: subTextColor, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Text("${prova.predio} - ${prova.sala}", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  // Botão MAPA
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pop(ctx); 
+                      servicoMapas.abrirLocalizacao(prova.predio).catchError((e) {
+                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                      });
+                    },
+                    icon: const Icon(Icons.map, color: AppColors.primaryPurple),
+                    tooltip: t.t('aluno_detalhes_ver_mapa'),
+                  )
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(t.t('fechar'), style: const TextStyle(color: AppColors.primaryPurple)),
+            )
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -97,7 +171,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
         iconTheme: IconThemeData(color: textColor),
       ),
       
-      // FAB para acesso rápido ao Chat
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
             Navigator.push(context, MaterialPageRoute(builder: (_) => _TelaChatIsolada(turmaId: turma.id, nomeDisciplina: turma.nome)));
@@ -112,7 +185,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. Botões de Ação (Materiais)
+            // 1. Botões
             Row(
               children: [
                 Expanded(
@@ -142,7 +215,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // 2. Card de Informações Gerais
-            _buildSectionTitle(t.t('hub_info_geral'), textColor), // "Informações Gerais"
+            _buildSectionTitle(t.t('hub_info_geral'), textColor),
             Card(
               color: cardColor,
               elevation: 2,
@@ -151,7 +224,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // Linha do Professor
+                    // Professor
                     Row(
                       children: [
                         CircleAvatar(
@@ -165,9 +238,19 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                             children: [
                               Text(t.t('hub_professor'), style: TextStyle(color: subTextColor, fontSize: 12)),
                               asyncProfessor.when(
-                                data: (prof) => Text(
-                                  prof?.alunoInfo?.nomeCompleto ?? "Professor", 
-                                  style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)
+                                data: (prof) => Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      prof?.alunoInfo?.nomeCompleto ?? "Professor", 
+                                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)
+                                    ),
+                                    if (prof?.email != null)
+                                      Text(
+                                        prof!.email, 
+                                        style: TextStyle(color: subTextColor, fontSize: 13)
+                                      ),
+                                  ],
                                 ),
                                 loading: () => const Text("...", style: TextStyle(fontSize: 14)),
                                 error: (_,__) => const Text("-", style: TextStyle(fontSize: 14)),
@@ -178,20 +261,91 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                       ],
                     ),
                     const Divider(height: 24),
+
+                    // Código da Turma
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.vpn_key, color: Colors.blue, size: 20),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.t('aluno_detalhes_codigo'), style: TextStyle(color: subTextColor, fontSize: 12)),
+                              SelectableText(
+                                turma.turmaCode,
+                                style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.5),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 20, color: Colors.grey),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: turma.turmaCode));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(t.t('aluno_detalhes_copiado')), backgroundColor: Colors.green, duration: const Duration(seconds: 1)),
+                            );
+                          },
+                        )
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // Localização da Aula
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(t.t('aluno_detalhes_sala'), style: TextStyle(color: subTextColor, fontSize: 12)),
+                              Text(
+                                turma.local,
+                                style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final nomePredio = _extrairNomePredio(turma.local);
+                            servicoMapas.abrirLocalizacao(nomePredio).catchError((e) {
+                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                            });
+                          },
+                          icon: const Icon(Icons.map, size: 16, color: Colors.white),
+                          label: Text(t.t('aluno_detalhes_ver_mapa'), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryPurple,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        )
+                      ],
+                    ),
+                    const Divider(height: 24),
                     
-                    // Linha de Frequência
+                    // Frequência
                     asyncAulas.when(
                       data: (snapshot) {
                         int total = snapshot.docs.length;
                         int presencas = 0;
                         
-                        // Calcula presença baseada nos arrays de IDs
                         if (alunoUid != null) {
                           for (var doc in snapshot.docs) {
                             final data = doc.data() as Map<String, dynamic>;
                             final pInicio = List.from(data['presentes_inicio']??[]);
                             final pFim = List.from(data['presentes_fim']??[]);
-                            // Se marcou presença no inicio OU fim, conta como presente
                             if (pInicio.contains(alunoUid) || pFim.contains(alunoUid)) presencas++;
                           }
                         }
@@ -223,12 +377,11 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
             const SizedBox(height: 24),
             
             // 3. Notas
-            _buildSectionTitle(t.t('hub_minhas_notas'), textColor), // "Minhas Notas"
+            _buildSectionTitle(t.t('hub_minhas_notas'), textColor),
             asyncNotas.when(
               loading: () => const SizedBox(),
               error: (_,__) => const SizedBox(),
               data: (notas) {
-                // Filtra apenas notas desta turma
                 final notasTurma = notas.where((n) => n.turmaId == turma.id).toList();
                 
                 if (notasTurma.isEmpty) {
@@ -236,7 +389,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                      color: cardColor, 
                      child: Padding(
                        padding: const EdgeInsets.all(16), 
-                       // CORREÇÃO: Tradução inserida aqui
                        child: Center(child: Text(t.t('detalhes_sem_notas'), style: TextStyle(color: subTextColor)))
                      )
                    );
@@ -270,8 +422,8 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
             
             const SizedBox(height: 24),
             
-            // 4. Próximas Provas
-            _buildSectionTitle(t.t('hub_proximas_provas'), textColor), // "Próximas Provas"
+            // 4. Próximas Provas (COM CLIQUE E DETALHES)
+            _buildSectionTitle(t.t('hub_proximas_provas'), textColor), 
              asyncProvas.when(
               loading: () => const SizedBox(),
               error: (_,__) => const SizedBox(),
@@ -283,7 +435,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                      color: cardColor, 
                      child: Padding(
                        padding: const EdgeInsets.all(16), 
-                       // CORREÇÃO: Tradução inserida aqui
                        child: Center(child: Text(t.t('detalhes_sem_provas'), style: TextStyle(color: subTextColor)))
                      )
                    );
@@ -300,7 +451,9 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                         child: const Icon(Icons.calendar_today, color: AppColors.cardOrange)
                       ), 
                       title: Text(p.titulo, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)), 
-                      subtitle: Text(DateFormat('dd/MM HH:mm').format(p.dataHora), style: TextStyle(color: subTextColor))
+                      subtitle: Text(DateFormat('dd/MM HH:mm').format(p.dataHora), style: TextStyle(color: subTextColor)),
+                      // Ação de clique adicionada
+                      onTap: () => _mostrarDetalhesProva(p),
                     )
                   )).toList()
                 );
@@ -317,6 +470,27 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0, left: 4), 
       child: Text(title, style: GoogleFonts.poppins(color: color, fontWeight: FontWeight.bold, fontSize: 18))
+    );
+  }
+
+  // Helper para linhas do dialog
+  Widget _buildDetailRow(IconData icon, String label, String value, Color? textColor, Color? subTextColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: subTextColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: subTextColor, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(value, style: TextStyle(color: textColor, fontSize: 16)),
+            ],
+          ),
+        ),
+      ],
     );
   }
   
@@ -348,7 +522,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
   }
 }
 
-/// Tela auxiliar para abrir o chat com AppBar dedicada.
 class _TelaChatIsolada extends StatelessWidget {
   final String turmaId;
   final String nomeDisciplina;
@@ -359,11 +532,10 @@ class _TelaChatIsolada extends StatelessWidget {
   Widget build(BuildContext context) {
      final theme = Theme.of(context);
      final textColor = theme.textTheme.bodyLarge?.color;
-     final t = AppLocalizations.of(context)!; // Recupera traduções
+     final t = AppLocalizations.of(context)!;
 
      return Scaffold(
        appBar: AppBar(
-         // CORREÇÃO: Título traduzido "Chat: Cálculo 1"
          title: Text(t.t('chat_titulo_sala', args: [nomeDisciplina]), style: TextStyle(color: textColor)),
          iconTheme: IconThemeData(color: textColor),
          backgroundColor: theme.scaffoldBackgroundColor,

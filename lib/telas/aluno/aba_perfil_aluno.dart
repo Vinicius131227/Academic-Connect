@@ -55,24 +55,7 @@ class AbaPerfilAluno extends ConsumerWidget {
     final info = usuario.alunoInfo!;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, 
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          // CORREÇÃO: Chave correta é 'perfil_titulo'
-          t.t('perfil_titulo'), 
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings_outlined, color: textColor),
-            tooltip: t.t('config_titulo'),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaConfiguracoes())),
-          ),
-        ],
-      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Column(
@@ -149,18 +132,6 @@ class AbaPerfilAluno extends ConsumerWidget {
 
              const SizedBox(height: 30),
              
-             // 4. Botão Sugestão
-             ListTile(
-               contentPadding: EdgeInsets.zero,
-               leading: Container(
-                 padding: const EdgeInsets.all(8),
-                 decoration: BoxDecoration(color: AppColors.primaryPurple.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                 child: const Icon(Icons.feedback, color: AppColors.primaryPurple),
-               ),
-               title: Text(t.t('perfil_sugestao_btn'), style: GoogleFonts.poppins(color: textColor, fontWeight: FontWeight.w500)),
-               trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
-               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSugestoes())),
-             ),
           ],
         ),
       ),
