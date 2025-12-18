@@ -6,11 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../themes/app_theme.dart';
 import 'tela_editar_perfil.dart';
-import 'tela_sugestoes.dart';
 import '../comum/tela_configuracoes.dart'; 
 import '../../l10n/app_localizations.dart';
 

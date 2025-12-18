@@ -14,7 +14,6 @@ import '../comum/overlay_carregamento.dart';
 import '../../themes/app_theme.dart';
 import 'portao_autenticacao.dart';
 
-/// Caso de uso para o Widgetbook.
 @UseCase(
   name: 'Cadastro de Usuário',
   type: TelaCadastroUsuario,
@@ -54,12 +53,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   final _dataNascimentoController = TextEditingController();
 
   DateTime? _dataNascimento;
-  // ignore: unused_field
-  String? _universidadeSelecionada = 'UFSCar - Campus Sorocaba';
-  
-  // Removido dropdown de tipo ID (agora só campo texto)
   String? _tipoIdentificacao; 
-  final List<String> _opcoesIdentificacao = ['Matrícula', 'SIAPE', 'Outro'];
 
   @override
   void initState() {
@@ -68,9 +62,20 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     _passwordController = TextEditingController(text: widget.password);
     _confirmPasswordController = TextEditingController(text: widget.password);
     
+    // Reseta o loading assim que a tela abre. 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(provedorCarregando.notifier).state = false;
+    });
+
     if (widget.isInitialSetup) {
       final user = ref.read(provedorNotificadorAutenticacao).usuario;
-      if (user != null) _emailController.text = user.email;
+      if (user != null) {
+         _emailController.text = user.email;
+         // Tenta preencher o nome se o Google já forneceu
+         if (user.alunoInfo?.nomeCompleto != null) {
+            _nomeController.text = user.alunoInfo!.nomeCompleto;
+         }
+      }
     }
   }
 
@@ -104,7 +109,6 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     
-    // Validação específica para aluno
     if (_papelSelecionado == 'aluno' && _dataNascimento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Data de nascimento obrigatória'), backgroundColor: Colors.redAccent)
@@ -112,11 +116,13 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
       return;
     }
 
+    // Ativa loading apenas para o processo de SALVAR
     ref.read(provedorCarregando.notifier).state = true;
     final t = AppLocalizations.of(context)!;
 
     try {
       if (widget.isInitialSetup) {
+        // Completar Cadastro (vindo do Google)
         if (_papelSelecionado == 'aluno') {
           final info = AlunoInfo(
             nomeCompleto: _nomeController.text.trim(),
@@ -129,7 +135,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
           await ref.read(provedorNotificadorAutenticacao.notifier).salvarPerfilAluno(info);
           await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel('aluno');
         } else {
-          // Professor / CA
+          // Professor
           await ref.read(provedorNotificadorAutenticacao.notifier).selecionarPapel(
             _papelSelecionado, 
             tipoIdentificacao: _tipoIdentificacao ?? 'N/A',
@@ -137,6 +143,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
           );
         }
       } else {
+        // Cadastro Novo (Email/Senha)
         if (_papelSelecionado == 'aluno') {
           await ref.read(provedorNotificadorAutenticacao.notifier).signUp(
             email: _emailController.text.trim(),
@@ -147,6 +154,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
             dataNascimento: _dataNascimento!,
           );
         } else {
+          // Professor
           await ref.read(provedorNotificadorAutenticacao.notifier).signUpComIdentificacao(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
@@ -159,28 +167,27 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
       }
       
       if (mounted) {
+        // Desativa loading antes de navegar
+        ref.read(provedorCarregando.notifier).state = false;
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(t.t('cadastro_sucesso')), backgroundColor: Colors.green)
         );
         
-        if (!widget.isInitialSetup) {
-             Navigator.of(context).pushAndRemoveUntil(
-               MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), 
-               (route) => false
-             );
-        } else {
-             Navigator.pop(context);
-        }
+        // Força a navegação para o Portão
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), 
+          (route) => false
+        );
       }
 
     } catch (e) {
       if (mounted) {
+        ref.read(provedorCarregando.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: Colors.red)
         );
       }
-    } finally {
-      if (mounted) ref.read(provedorCarregando.notifier).state = false;
     }
   }
 
@@ -188,8 +195,8 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     ref.read(provedorCarregando.notifier).state = true;
     try {
        await ref.read(provedorNotificadorAutenticacao.notifier).loginComGoogle();
-    } finally {
-       if (mounted) ref.read(provedorCarregando.notifier).state = false;
+    } catch (e) {
+       ref.read(provedorCarregando.notifier).state = false;
     }
   }
 
@@ -206,16 +213,6 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     final Color fillColor = isDark ? AppColors.surfaceDark : Colors.white;
     final Color dropdownColor = isDark ? AppColors.surfaceDark : Colors.white;
     final bool isDesktop = MediaQuery.of(context).size.width > 800;
-
-    // Listener de segurança
-    ref.listen(provedorNotificadorAutenticacao, (previous, next) {
-       if (next.status == StatusAutenticacao.autenticado && !widget.isInitialSetup) {
-           Navigator.of(context).pushAndRemoveUntil(
-             MaterialPageRoute(builder: (_) => const PortaoAutenticacao()), 
-             (route) => false
-           );
-       }
-    });
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -260,8 +257,8 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                           context,
                           label: t.t('cadastro_papel_label'),
                           value: _papelSelecionado,
-                          items: ['aluno', 'professor', 'ca_projeto'],
-                          displayItems: [t.t('papel_aluno'), t.t('papel_professor'), t.t('papel_ca')],
+                          items: ['aluno', 'professor'], 
+                          displayItems: [t.t('papel_aluno'), t.t('papel_professor')],
                           onChanged: estaCarregando ? null : (v) {
                             if (v != null) {
                               setState(() {
@@ -281,6 +278,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         ),
                         const SizedBox(height: 20),
 
+                        // Nome
                         _buildStyledTextField(
                           context, 
                           controller: _nomeController, 
@@ -293,6 +291,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                         ),
                         const SizedBox(height: 20),
 
+                        // Campos extras apenas se NÃO for initial setup (não veio do Google)
                         if (!widget.isInitialSetup) ...[
                           _buildStyledTextField(context, controller: _emailController, label: t.t('login_email'), hint: 'user@email.com', enabled: !estaCarregando, inputType: TextInputType.emailAddress, textColor: textColor, subTextColor: subTextColor, fillColor: fillColor),
                           const SizedBox(height: 20),
@@ -302,12 +301,12 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                           const SizedBox(height: 20),
                         ],
 
+                        // Campos específicos ALUNO vs PROFESSOR
                         if (_papelSelecionado == 'aluno') ...[
                           _buildStyledDropdown(
                             context,
                             label: t.t('cadastro_curso'),
                             value: _cursoController.text.isEmpty ? null : _cursoController.text,
-                            // CORRECTION: Use `t.cursos` (instance member) instead of `AppLocalizations.cursos` (static member)
                             items: t.cursos, 
                             onChanged: estaCarregando ? null : (v) { if (v != null) setState(() => _cursoController.text = v); },
                             textColor: textColor,
@@ -323,11 +322,10 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                             child: AbsorbPointer(child: _buildStyledTextField(context, controller: _dataNascimentoController, label: t.t('cadastro_data_nasc_label'), hint: 'dd/mm/aaaa', suffixIcon: Icon(Icons.calendar_today, color: subTextColor, size: 18), textColor: textColor, subTextColor: subTextColor, fillColor: fillColor)),
                           ),
                         ] else ...[
-                           // Para Prof/CA: Identificação Genérica
                            _buildStyledTextField(
                              context, 
                              controller: _raOuIdController, 
-                             label: t.t('cadastro_num_prof'), // "Número de Identificação"
+                             label: t.t('cadastro_num_prof'), 
                              hint: '123456', 
                              enabled: !estaCarregando, 
                              textColor: textColor, 
@@ -338,7 +336,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
 
                         const SizedBox(height: 40),
 
-                        // Botão Cadastrar
+                        // Botão Cadastrar/Salvar
                         SizedBox(
                           width: double.infinity,
                           height: 50,
@@ -349,7 +347,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                           ),
                         ),
                         
-                        // Botão Google
+                        // Botão Google (Só aparece se for cadastro do zero, não se for completar cadastro)
                         if (!widget.isInitialSetup) ...[
                           const SizedBox(height: 24),
                           SizedBox(
@@ -362,7 +360,6 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
                                 Image.asset(
                                   'assets/images/google_logo.png', 
                                   height: 24,
-                                  // Fallback caso a imagem não carregue
                                   errorBuilder: (c,e,s) => const Icon(Icons.g_mobiledata, size: 24),
                                 ), 
                                 const SizedBox(width: 12), 
@@ -379,7 +376,6 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
             ),
           ),
           
-          // --- LADO DIREITO: ARTE (DESKTOP) ---
           if (isDesktop)
             Expanded(
               flex: 5,
@@ -405,7 +401,7 @@ class _TelaCadastroUsuarioState extends ConsumerState<TelaCadastroUsuario> {
     );
   }
 
-  // --- WIDGETS AUXILIARES COM TRADUÇÃO E ESTILO ---
+  // --- WIDGETS AUXILIARES ---
 
   Widget _buildStyledTextField(BuildContext context, {required TextEditingController controller, required String label, String hint = '', bool isObscure = false, bool enabled = true, TextInputType? inputType, Widget? suffixIcon, String? Function(String?)? validator, required Color textColor, required Color subTextColor, required Color fillColor}) {
     final t = AppLocalizations.of(context)!;

@@ -136,7 +136,6 @@ class _TelaDicasGeraisState extends ConsumerState<TelaDicasGerais> {
                 );
               },
               data: (dicas) {
-                // Filtro local usando o campo 'materia' que agora existe no Model
                 final dicasFiltradas = dicas.where((d) {
                   final texto = d.texto.toLowerCase();
                   final materia = d.materia.toLowerCase(); 
@@ -199,7 +198,6 @@ class _TelaDicasGeraisState extends ConsumerState<TelaDicasGerais> {
                             const SizedBox(height: 12),
                             Align(
                               alignment: Alignment.centerRight,
-                              // CAMPO autorNome AGORA EXISTE
                               child: Text(
                                 "por: ${dica.autorNome}",
                                 style: TextStyle(color: textColor.withOpacity(0.4), fontSize: 11, fontStyle: FontStyle.italic),

@@ -9,6 +9,7 @@ class UsuarioApp {
   final AlunoInfo? alunoInfo;
   final String? nfcCardId;
   final String? tipoIdentificacao;
+  final Map<String, dynamic>? professorInfo;
 
   UsuarioApp({
     required this.uid,
@@ -17,6 +18,7 @@ class UsuarioApp {
     this.alunoInfo,
     this.nfcCardId,
     this.tipoIdentificacao,
+    this.professorInfo, // Adicionado ao construtor
   });
 
   Map<String, dynamic> toMap() {
@@ -27,6 +29,7 @@ class UsuarioApp {
       'alunoInfo': alunoInfo?.toMap(),
       'nfcCardId': nfcCardId,
       'tipoIdentificacao': tipoIdentificacao,
+      'professorInfo': professorInfo, // Salva no banco
     };
   }
 
@@ -41,17 +44,27 @@ class UsuarioApp {
           : null,
       nfcCardId: data['nfcCardId'],
       tipoIdentificacao: data['tipoIdentificacao'],
+      
+      // Carrega o mapa do professor se existir
+      professorInfo: data['professorInfo'] != null 
+          ? Map<String, dynamic>.from(data['professorInfo']) 
+          : null,
     );
   }
 
-  UsuarioApp copyWith({AlunoInfo? alunoInfo, String? nfcCardId}) {
+  UsuarioApp copyWith({
+    AlunoInfo? alunoInfo, 
+    String? nfcCardId,
+    Map<String, dynamic>? professorInfo, // Adicionado ao copyWith
+  }) {
     return UsuarioApp(
       uid: uid,
       email: email,
       papel: papel,
       alunoInfo: alunoInfo ?? this.alunoInfo,
-      nfcCardId: nfcCardId ?? this.nfcCardId, // Usa o novo se passar, senão mantém
+      nfcCardId: nfcCardId ?? this.nfcCardId,
       tipoIdentificacao: tipoIdentificacao,
+      professorInfo: professorInfo ?? this.professorInfo,
     );
   }
 }

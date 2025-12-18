@@ -1,11 +1,18 @@
 // lib/telas/professor/tela_presenca_nfc.dart
+
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import '../../models/turma_professor.dart';
+import '../../models/aluno_chamada.dart'; 
 import '../../providers/provedor_professor.dart';
+import '../../services/servico_firestore.dart';
 import '../../l10n/app_localizations.dart';
 import '../comum/widget_carregamento.dart';
-import 'package:intl/intl.dart';
+import '../../themes/app_theme.dart';
 
 class TelaPresencaNFC extends ConsumerStatefulWidget {
   final TurmaProfessor turma;
@@ -15,116 +22,149 @@ class TelaPresencaNFC extends ConsumerStatefulWidget {
   ConsumerState<TelaPresencaNFC> createState() => _TelaPresencaNFCState();
 }
 
-class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
+class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> with WidgetsBindingObserver {
+  final Set<String> _idsPresentes = {};
+  final List<AlunoChamada> _listaVisual = [];
   bool _isLoading = false;
-  DateTime _dataSelecionada = DateTime.now();
-  String? _tipoChamadaFinal; 
+  
+  String? _ultimoSucesso;
+  String? _ultimoErro;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(provedorPresencaNFC.notifier).reset());
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() => ref.read(provedorCadastroNFC.notifier).reset());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarPresencaExistente();
+    });
   }
 
   @override
   void dispose() {
-    Future.microtask(() => ref.read(provedorPresencaNFC.notifier).pausarLeitura());
+    WidgetsBinding.instance.removeObserver(this);
+    Future.microtask(() => ref.read(provedorCadastroNFC.notifier).pausarLeitura());
     super.dispose();
   }
-  
-  Future<void> _selecionarData(BuildContext context) async {
-    final DateTime? data = await showDatePicker(
-      context: context,
-      initialDate: _dataSelecionada,
-      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-      lastDate: DateTime.now(),
-      locale: const Locale('pt', 'BR'),
-    );
-    if (data != null) {
-      setState(() => _dataSelecionada = data);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      ref.read(provedorCadastroNFC.notifier).pausarLeitura();
     }
   }
 
-  Future<void> _onSalvar(BuildContext context) async {
-    final t = AppLocalizations.of(context)!;
-    final notifierNFC = ref.read(provedorPresencaNFC.notifier);
+  Future<void> _carregarPresencaExistente() async {
+    setState(() => _isLoading = true);
+    try {
+      final servico = ref.read(servicoFirestoreProvider);
+      final dataId = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final dadosAula = await servico.getDadosChamada(widget.turma.id, dataId);
+      
+      if (dadosAula.isNotEmpty) {
+        final listaIds = List<String>.from(dadosAula['presentes_inicio'] ?? []);
+        if (listaIds.isNotEmpty) {
+          final todosAlunos = await servico.getAlunosDaTurma(widget.turma.id);
+          setState(() {
+            _idsPresentes.clear();
+            _listaVisual.clear();
+            _idsPresentes.addAll(listaIds);
+            for (var aluno in todosAlunos) {
+              if (listaIds.contains(aluno.id)) {
+                _listaVisual.add(aluno);
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Erro load: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-    // 1. Pergunta ao professor qual chamada ele está fazendo
-    final String? tipoChamada = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.t('prof_chamada_tipo_titulo')),
-        content: Text(t.t('prof_chamada_tipo_desc')),
-        actions: [
-          TextButton(
-            child: Text(t.t('prof_chamada_tipo_inicio')),
-            onPressed: () => Navigator.pop(ctx, 'inicio'),
-          ),
-          ElevatedButton(
-            child: Text(t.t('prof_chamada_tipo_fim')),
-            onPressed: () => Navigator.pop(ctx, 'fim'),
-          ),
-        ],
-      ),
+  Future<void> _processarTagLida(String nfcId) async {
+    final servico = ref.read(servicoFirestoreProvider);
+    final usuarioAluno = await servico.getAlunoPorNFC(nfcId);
+
+    if (usuarioAluno == null) {
+      _mostrarFeedback(erro: "Cartão não cadastrado.");
+      return;
+    }
+
+    if (!widget.turma.alunosInscritos.contains(usuarioAluno.uid)) {
+       _mostrarFeedback(erro: "Aluno não é desta turma.");
+       return;
+    }
+
+    if (_idsPresentes.contains(usuarioAluno.uid)) {
+       _mostrarFeedback(erro: "Já registrou presença hoje.");
+       return;
+    }
+
+    final novoAluno = AlunoChamada(
+      id: usuarioAluno.uid,
+      nome: usuarioAluno.alunoInfo?.nomeCompleto ?? 'Aluno',
+      ra: usuarioAluno.alunoInfo?.ra ?? '',
+      hora: DateFormat('HH:mm').format(DateTime.now()),
     );
 
-    if (tipoChamada == null || !context.mounted) return;
-
     setState(() {
-      _isLoading = true;
-      _tipoChamadaFinal = tipoChamada;
+      _idsPresentes.add(usuarioAluno.uid);
+      _listaVisual.insert(0, novoAluno);
     });
 
     try {
-      // 2. Chama o notificador para salvar no Firebase, passando a data selecionada
-      await notifierNFC.salvarChamadaNFC(widget.turma.id, tipoChamada, _dataSelecionada);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Chamada ($tipoChamada) salva com sucesso!'), backgroundColor: Colors.green),
-        );
-        Navigator.pop(context);
-      }
+      await servico.salvarPresenca(
+        widget.turma.id, 
+        'inicio', 
+        _idsPresentes.toList(), 
+        DateTime.now()
+      );
+      _mostrarFeedback(sucesso: "Presença: ${usuarioAluno.alunoInfo?.nomeCompleto}");
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: ${e.toString()}'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _idsPresentes.remove(usuarioAluno.uid);
+        _listaVisual.removeAt(0);
+      });
+      _mostrarFeedback(erro: "Erro ao salvar.");
     }
+  }
+
+  void _mostrarFeedback({String? sucesso, String? erro}) {
+    setState(() {
+      _ultimoSucesso = sucesso;
+      _ultimoErro = erro;
+    });
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() { _ultimoSucesso = null; _ultimoErro = null; });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-    final estadoNFC = ref.watch(provedorPresencaNFC); 
-    final notifierNFC = ref.read(provedorPresencaNFC.notifier);
-    final bool lendo = estadoNFC.status == StatusNFC.lendo;
-    
-    // Observa o provedor de pré-chamada para verificar bloqueios
-    final asyncPreChamada = ref.watch(provedorPreChamada(widget.turma));
-    final preChamada = asyncPreChamada.value;
+    final estadoNFC = ref.watch(provedorCadastroNFC);
+    final notifierNFC = ref.read(provedorCadastroNFC.notifier);
+    final bool lendo = estadoNFC.status == StatusCadastroNFC.scanning;
+
+    ref.listen(provedorCadastroNFC, (prev, next) {
+      if (next.status == StatusCadastroNFC.success && next.uid != null) {
+        _processarTagLida(next.uid!);
+        notifierNFC.reset();
+        Future.delayed(const Duration(seconds: 1), () {
+           if (mounted && lendo) notifierNFC.iniciarLeitura();
+        });
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
         title: Text(t.t('prof_presenca_nfc_titulo')),
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(30.0),
-          child: Container(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            alignment: Alignment.center,
-            child: Text(
-              widget.turma.nome,
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          ),
-        ),
       ),
       body: Stack(
         children: [
@@ -132,52 +172,21 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                // --- Bloco de Status e Ações ---
-                if (asyncPreChamada.isLoading)
-                  const WidgetCarregamento(texto: 'Verificando horário...')
-                else if (preChamada?.bloqueioMensagem != null && preChamada?.podeChamar == false)
-                  Card(
-                    color: Colors.red.withOpacity(0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(preChamada!.bloqueioMensagem!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                          
-                          // Opção de Selecionar Data para Chamada Retroativa
-                          if (preChamada.bloqueioMensagem == t.t('chamada_aviso_passado'))
-                            OutlinedButton.icon(
-                              icon: const Icon(Icons.date_range),
-                              label: Text('Dia Selecionado: ${DateFormat('dd/MM/yyyy').format(_dataSelecionada)}'),
-                              onPressed: () => _selecionarData(context),
-                            ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  _buildCardLeitura(context, t, lendo, estadoNFC.status, estadoNFC.erro, notifierNFC, widget.turma.id, preChamada!.podeChamar),
-                // --- Fim Bloco de Status ---
-
+                _buildCardLeitura(context, t, lendo, estadoNFC.status, estadoNFC.erro, notifierNFC),
                 const SizedBox(height: 16),
-                _buildCardPresentes(context, t, estadoNFC, preChamada?.podeChamar ?? false),
+                _buildCardPresentes(context, t),
                 const SizedBox(height: 16),
-                _buildCardRegistrados(context, t, estadoNFC),
+                _buildCardRegistrados(context, t),
               ],
             ),
           ),
-          _buildFeedbackPopup(
-            context,
-            sucessoMsg: estadoNFC.ultimoAluno,
-            erroMsg: estadoNFC.ultimoErroScan,
-          ),
+          _buildFeedbackPopup(context),
         ],
       ),
     );
   }
 
-  Widget _buildCardLeitura(BuildContext context, AppLocalizations t, bool lendo, StatusNFC status, String? erro, NotificadorPresencaNFC notifier, String turmaId, bool podeChamar) {
+  Widget _buildCardLeitura(BuildContext context, AppLocalizations t, bool lendo, StatusCadastroNFC status, String? erro, NotificadorCadastroNFC notifier) {
     IconData icone = Icons.nfc;
     Color corIcone = Colors.grey;
     String titulo = t.t('prof_presenca_nfc_pausada_titulo'); 
@@ -187,17 +196,11 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
       icone = Icons.nfc; corIcone = Colors.green;
       titulo = t.t('prof_presenca_nfc_lendo_titulo'); 
       subtitulo = t.t('prof_presenca_nfc_lendo_desc'); 
-    } else if (status == StatusNFC.indisponivel) {
-      icone = Icons.nfc_outlined; corIcone = Colors.red;
-      titulo = t.t('prof_presenca_nfc_indisponivel_titulo'); 
-      subtitulo = erro ?? t.t('prof_presenca_nfc_indisponivel_desc'); 
-    } else if (status == StatusNFC.erro) {
+    } else if (status == StatusCadastroNFC.error) {
       icone = Icons.error_outline; corIcone = Colors.red;
       titulo = t.t('prof_presenca_nfc_erro_titulo'); 
       subtitulo = erro ?? t.t('prof_presenca_nfc_erro_desc'); 
     }
-    
-    final bool isEnabled = podeChamar && (status != StatusNFC.indisponivel);
     
     return Card(
       child: Padding(
@@ -208,7 +211,7 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
             const SizedBox(height: 16),
             Text(titulo, style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
             const SizedBox(height: 8),
-            Text(subtitulo, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: (status == StatusNFC.erro || status == StatusNFC.indisponivel) ? Colors.red : null), textAlign: TextAlign.center),
+            Text(subtitulo, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               icon: Icon(lendo ? Icons.pause : Icons.play_arrow),
@@ -218,9 +221,9 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
-              onPressed: isEnabled ? () {
-                lendo ? notifier.pausarLeitura() : notifier.iniciarLeitura(turmaId);
-              } : null,
+              onPressed: () {
+                lendo ? notifier.pausarLeitura() : notifier.iniciarLeitura();
+              },
             ),
           ],
         ),
@@ -228,7 +231,7 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
     );
   }
 
-  Widget _buildCardPresentes(BuildContext context, AppLocalizations t, EstadoPresencaNFC estado, bool podeChamar) {
+  Widget _buildCardPresentes(BuildContext context, AppLocalizations t) {
     return Card(
       color: Colors.green[50],
       child: Padding(
@@ -242,10 +245,8 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
                   const SizedBox(width: 8),
                   Expanded( 
                     child: Text(
-                      '${t.t('prof_presenca_presentes')}: ${estado.presentes.length}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.green[800],
-                            ),
+                      '${t.t('prof_presenca_presentes')}: ${_listaVisual.length}',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.green[800]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -254,20 +255,20 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
               ),
             ),
             const SizedBox(width: 8), 
-            if (estado.presentes.isNotEmpty)
-              ElevatedButton(
-                onPressed: podeChamar && !_isLoading ? () => _onSalvar(context) : null,
-                child: _isLoading 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(t.t('prof_presenca_nfc_finalizar')),
-              ),
+            ElevatedButton(
+              onPressed: () {
+                ref.read(provedorCadastroNFC.notifier).pausarLeitura();
+                Navigator.pop(context);
+              },
+              child: Text(t.t('prof_presenca_nfc_finalizar')),
+            ),
           ],
         ),
       ),
     );
   }
   
-  Widget _buildCardRegistrados(BuildContext context, AppLocalizations t, EstadoPresencaNFC estado) {
+  Widget _buildCardRegistrados(BuildContext context, AppLocalizations t) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -279,25 +280,25 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const Divider(height: 24),
-            if (estado.presentes.isEmpty)
+            if (_listaVisual.isEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Text(t.t('prof_presenca_nfc_vazio')),
+                  child: Text(_isLoading ? "Carregando..." : t.t('prof_presenca_nfc_vazio')),
                 ),
               )
             else
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: estado.presentes.length,
+                itemCount: _listaVisual.length,
                 itemBuilder: (context, index) {
-                  final aluno = estado.presentes.reversed.toList()[index];
+                  final aluno = _listaVisual[index];
                   return ListTile(
                     leading: const Icon(Icons.check_circle, color: Colors.green),
                     title: Text(aluno.nome),
-                    subtitle: Text(t.t('prof_presenca_nfc_presente')),
-                    trailing: Text(aluno.hora),
+                    subtitle: Text(aluno.ra),
+                    trailing: Text(aluno.hora ?? "Presença"),
                   );
                 },
               ),
@@ -307,11 +308,8 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
     );
   }
 
-  Widget _buildFeedbackPopup(BuildContext context, {String? sucessoMsg, String? erroMsg}) {
-    bool mostrarSucesso = sucessoMsg != null;
-    bool mostrarErro = erroMsg != null;
-    bool mostrar = mostrarSucesso || mostrarErro;
-    
+  Widget _buildFeedbackPopup(BuildContext context) {
+    bool mostrar = _ultimoSucesso != null || _ultimoErro != null;
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -322,17 +320,17 @@ class _TelaPresencaNFCState extends ConsumerState<TelaPresencaNFC> {
         elevation: 4.0,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          color: mostrarSucesso ? Colors.green : Colors.red,
+          color: _ultimoErro != null ? Colors.red : Colors.green,
           child: SafeArea(
             bottom: false,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(mostrarSucesso ? Icons.check_circle : Icons.error, color: Colors.white),
+                Icon(_ultimoErro != null ? Icons.error : Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    sucessoMsg ?? erroMsg ?? '',
+                    _ultimoSucesso ?? _ultimoErro ?? '',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

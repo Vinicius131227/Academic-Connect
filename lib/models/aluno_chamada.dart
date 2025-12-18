@@ -1,25 +1,27 @@
 // lib/models/aluno_chamada.dart
 
-/// Modelo simples usado apenas em tempo de execução para listas de presença.
 class AlunoChamada {
   final String id;
   final String nome;
   final String ra;
-  bool isPresente; // Estado local (checkbox)
+  final String? fotoUrl;
+  final String? hora;
 
   AlunoChamada({
     required this.id,
     required this.nome,
     required this.ra,
-    this.isPresente = false,
+    this.fotoUrl,
+    this.hora,
   });
-  
-  AlunoChamada copyWith({bool? isPresente}) {
+
+  // Factory para criar a partir do Map do Firestore
+  factory AlunoChamada.fromMap(Map<String, dynamic> map, String idDoc) {
     return AlunoChamada(
-      id: id,
-      nome: nome,
-      ra: ra,
-      isPresente: isPresente ?? this.isPresente
+      id: idDoc, // Ou map['uid'] dependendo de como você salva
+      nome: map['nome'] ?? 'Sem Nome',
+      ra: map['ra'] ?? '',
+      fotoUrl: map['fotoUrl'],
     );
   }
 }

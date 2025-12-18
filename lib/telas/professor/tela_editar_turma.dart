@@ -5,13 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../../services/servico_firestore.dart';
-import '../../l10n/app_localizations.dart'; // Traduções
+import '../../l10n/app_localizations.dart';
 import '../comum/overlay_carregamento.dart';
-import '../../themes/app_theme.dart'; // Cores e Temas
+import '../../themes/app_theme.dart';
 
 /// Caso de uso para o Widgetbook.
 @UseCase(
@@ -201,7 +200,6 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
       if (mounted) {
         ref.read(provedorCarregando.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
-          // TRADUZIDO: "Turma atualizada com sucesso!"
           SnackBar(content: Text(t.t('prof_turma_atualizada')), backgroundColor: Colors.green), 
         );
         Navigator.pop(context);
@@ -210,7 +208,6 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
       if (mounted) {
         ref.read(provedorCarregando.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
-          // TRADUZIDO: "Erro ao atualizar: ..."
           SnackBar(content: Text(t.t('erro_atualizar', args: [e.toString()])), backgroundColor: Colors.red),
         );
       }
@@ -294,7 +291,6 @@ class _TelaEditarTurmaState extends ConsumerState<TelaEditarTurma> {
                     child: TextFormField(
                       controller: _salaController,
                       style: TextStyle(color: textColor),
-                      // TRADUZIDO: "Sala"
                       decoration: _inputDecor(context, t.t('criar_turma_sala'), hint: t.t('criar_turma_local_hint')),
                       validator: (v) => v!.isEmpty ? t.t('erro_obrigatorio') : null,
                     ),

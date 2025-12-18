@@ -10,8 +10,7 @@ import '../../providers/provedor_autenticacao.dart';
 import '../../themes/app_theme.dart';
 import '../comum/tela_configuracoes.dart'; 
 import '../../l10n/app_localizations.dart';
-import '../aluno/tela_editar_perfil.dart'; // Reusa a tela de edição
-import '../aluno/tela_sugestoes.dart';
+import '../aluno/tela_editar_perfil.dart';
 
 /// Caso de uso para o Widgetbook.
 /// Permite visualizar a tela de perfil do professor isoladamente.

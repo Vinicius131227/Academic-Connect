@@ -15,48 +15,22 @@ import '../models/prova_agendada.dart';
 // ===========================================================================
 
 /// Escuta em tempo real as **Turmas** criadas pelo professor logado.
-///
-/// Utiliza o UID do usuário autenticado para filtrar apenas as turmas que
-/// pertencem a ele.
-/// Retorna: `List<TurmaProfessor>`
-final provedorStreamTurmasProfessor = StreamProvider<List<TurmaProfessor>>((ref) {
-  // 1. Observa o estado da autenticação
-  final authState = ref.watch(provedorNotificadorAutenticacao);
-  final servico = ref.watch(servicoFirestoreProvider);
-  
-  final uid = authState.usuario?.uid;
-
-  // 2. Segurança: Se não houver usuário logado, retorna lista vazia
-  if (uid == null) {
-    return Stream.value([]);
-  }
-
-  // 3. Busca os dados no Firestore
-  return servico.getTurmasProfessor(uid);
+final provedorStreamTurmasProfessor = StreamProvider.autoDispose<List<TurmaProfessor>>((ref) {
+  final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(servicoFirestoreProvider).getTurmasProfessor(usuario.uid);
 });
 
-/// Escuta em tempo real as **Solicitações** (ex: abono, adaptação) enviadas
-/// pelos alunos para este professor.
-///
-/// Retorna: `List<SolicitacaoAluno>`
-final provedorStreamSolicitacoesProfessor = StreamProvider<List<SolicitacaoAluno>>((ref) {
-  final authState = ref.watch(provedorNotificadorAutenticacao);
-  final servico = ref.watch(servicoFirestoreProvider);
-  
-  final uid = authState.usuario?.uid;
-
-  if (uid == null) {
-    return Stream.value([]);
-  }
-
-  return servico.getSolicitacoes(uid);
+/// Escuta em tempo real as **Solicitações** enviadas para este professor.
+final provedorStreamSolicitacoesProfessor = StreamProvider.autoDispose<List<SolicitacaoAluno>>((ref) {
+  final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+  if (usuario == null) return const Stream.empty();
+  // Atualizado para chamar o método específico do professor
+  return ref.watch(servicoFirestoreProvider).getSolicitacoesProfessor(usuario.uid);
 });
 
-/// Provedor derivado que filtra a lista de solicitações acima,
-/// retornando apenas aquelas que estão com status **"Pendente"**.
-///
-/// Útil para mostrar contadores de notificação ou badges.
-final provedorSolicitacoesPendentes = Provider<List<SolicitacaoAluno>>((ref) {
+/// Filtra apenas solicitações **Pendentes** (Útil para badges de notificação).
+final provedorSolicitacoesPendentes = Provider.autoDispose<List<SolicitacaoAluno>>((ref) {
   final asyncSolicitacoes = ref.watch(provedorStreamSolicitacoesProfessor);
   
   return asyncSolicitacoes.valueOrNull
@@ -64,70 +38,43 @@ final provedorSolicitacoesPendentes = Provider<List<SolicitacaoAluno>>((ref) {
           .toList() ?? [];
 });
 
-
 // ===========================================================================
 // 🎓 SEÇÃO 2: PROVEDORES DO ALUNO
 // ===========================================================================
 
 /// Escuta em tempo real as **Turmas** nas quais o aluno está inscrito.
-///
-/// Diferente do professor (que vê as turmas que criou), aqui vemos
-/// as turmas onde o ID do aluno está na lista de inscritos.
-final provedorStreamTurmasAluno = StreamProvider<List<TurmaProfessor>>((ref) {
-  final authState = ref.watch(provedorNotificadorAutenticacao);
-  final servico = ref.watch(servicoFirestoreProvider);
-  
-  final uid = authState.usuario?.uid;
-
-  if (uid == null) {
-    return Stream.value([]);
-  }
-
-  return servico.getTurmasAluno(uid);
+final provedorStreamTurmasAluno = StreamProvider.autoDispose<List<TurmaProfessor>>((ref) {
+  final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(servicoFirestoreProvider).getTurmasAluno(usuario.uid);
 });
 
 /// Escuta em tempo real as **Notas e Frequências** do aluno logado.
-///
-/// Retorna: `List<DisciplinaNotas>` contendo o desempenho em cada matéria.
-final provedorStreamNotasAluno = StreamProvider<List<DisciplinaNotas>>((ref) {
-  final authState = ref.watch(provedorNotificadorAutenticacao);
-  final servico = ref.watch(servicoFirestoreProvider);
-  
-  final uid = authState.usuario?.uid;
-
-  if (uid == null) {
-    return Stream.value([]);
-  }
-
-  return servico.getNotasAluno(uid);
+final provedorStreamNotasAluno = StreamProvider.autoDispose<List<DisciplinaNotas>>((ref) {
+  final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(servicoFirestoreProvider).getNotasAluno(usuario.uid);
 });
 
-/// Escuta o histórico de **Solicitações** feitas pelo próprio aluno.
-///
-/// Permite que o aluno acompanhe se o pedido foi aprovado ou recusado.
-final provedorStreamSolicitacoesAluno = StreamProvider<List<SolicitacaoAluno>>((ref) {
-  final authState = ref.watch(provedorNotificadorAutenticacao);
-  final servico = ref.watch(servicoFirestoreProvider);
-  
-  final uid = authState.usuario?.uid;
-
-  if (uid == null) {
-    return Stream.value([]);
-  }
-
-  return servico.getSolicitacoesAluno(uid);
+/// Escuta o histórico de **Solicitações** feitas pelo próprio aluno (Específico).
+final provedorStreamSolicitacoesAluno = StreamProvider.autoDispose<List<SolicitacaoAluno>>((ref) {
+  final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
+  if (usuario == null) return const Stream.empty();
+  return ref.watch(servicoFirestoreProvider).getSolicitacoesAluno(usuario.uid);
 });
-
 
 // ===========================================================================
 // 🗓️ SEÇÃO 3: PROVEDORES GERAIS (Compartilhados)
 // ===========================================================================
 
-/// Escuta o **Calendário Global** de provas e entregas.
-///
-/// Usado para popular a tela de Calendário e os widgets de "Próximas Avaliações".
-final provedorStreamCalendario = StreamProvider<List<ProvaAgendada>>((ref) {
-  final servico = ref.watch(servicoFirestoreProvider);
-  return servico.getCalendarioDeProvas();
+/// Escuta o **Calendário Global** de provas.
+final provedorStreamCalendario = StreamProvider.autoDispose<List<ProvaAgendada>>((ref) {
+  // Atualizado para o nome correto no serviço
+  return ref.watch(servicoFirestoreProvider).getTodasProvas();
 });
 
+/// Escuta TODAS as solicitações (usado para filtros client-side se necessário).
+/// Adicionado para corrigir o erro na tela "Minhas Solicitações".
+final provedorStreamSolicitacoesGeral = StreamProvider.autoDispose<List<SolicitacaoAluno>>((ref) {
+  return ref.watch(servicoFirestoreProvider).getTodasSolicitacoesStream();
+});

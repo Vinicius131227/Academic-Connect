@@ -166,7 +166,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
   
-  /// Cadastro de Professor ou C.A.
+  /// Cadastro de Professor
   Future<void> signUpComIdentificacao({
     required String email, 
     required String password, 
@@ -269,7 +269,7 @@ class NotificadorAutenticacao extends StateNotifier<EstadoAutenticacao> {
     }
   }
 
-  /// Define o papel do usuário (Aluno, Prof, CA).
+  /// Define o papel do usuário (Aluno, Prof).
   Future<void> selecionarPapel(String papel, {String? tipoIdentificacao, String? numIdentificacao}) async {
     final user = state.usuario;
     if (user == null) return;

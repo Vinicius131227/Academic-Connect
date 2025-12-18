@@ -2,10 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart'; // Formatação de datas
+import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../models/prova_agendada.dart';
 import '../../services/servico_firestore.dart';
@@ -223,7 +222,6 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
               ),
               const SizedBox(height: 16),
               
-              // Prédio (CORRIGIDO AQUI)
               DropdownButtonFormField<String>(
                 value: _predioSelecionado,
                 style: TextStyle(color: textColor),
@@ -234,7 +232,6 @@ class _TelaMarcarProvaState extends ConsumerState<TelaMarcarProva> {
                   filled: true,
                   fillColor: isDark ? AppColors.surfaceDark : Colors.white,
                 ),
-                // CORREÇÃO: Usando t.predios (instância)
                 items: t.predios.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
                 onChanged: (v) => setState(() => _predioSelecionado = v),
                 validator: (v) => (v == null || v.isEmpty) ? t.t('campo_obrigatorio') : null,

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/material_aula.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/servico_firestore.dart';

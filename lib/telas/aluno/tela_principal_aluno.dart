@@ -1,17 +1,13 @@
-// lib/telas/aluno/tela_principal_aluno.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/servico_preferencias.dart'; 
-import '../comum/tela_configuracoes.dart';
+
+import '../../services/servico_preferencias.dart';
+import '../../themes/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import 'aba_inicio_aluno.dart';
 import 'aba_disciplinas_aluno.dart';
 import 'aba_perfil_aluno.dart';
-import '../../l10n/app_localizations.dart'; 
-
-// NÃO IMPORTE O APP_THEME AQUI SE NÃO FOR USAR EXPLICITAMENTE AS CORES.
-// A CLASSE ABA_INICIO_ALUNO JÁ IMPORTA.
-// SE PRECISAR DE CORES AQUI, CERTIFIQUE-SE DE QUE NENHUM OUTRO ARQUIVO NESTA TELA
-// ESTEJA DEFININDO 'AppColors' TAMBÉM.
+import '../comum/tela_configuracoes.dart';
 
 class TelaPrincipalAluno extends ConsumerStatefulWidget {
   const TelaPrincipalAluno({super.key});
@@ -21,8 +17,9 @@ class TelaPrincipalAluno extends ConsumerStatefulWidget {
 }
 
 class _TelaPrincipalAlunoState extends ConsumerState<TelaPrincipalAluno> {
-  int _indiceAtual = 0; 
+  int _indiceAtual = 0;
 
+  // Lista das telas que compõem as abas
   final List<Widget> _telas = [
     const AbaInicioAluno(),
     const AbaDisciplinasAluno(),
@@ -55,17 +52,22 @@ class _TelaPrincipalAlunoState extends ConsumerState<TelaPrincipalAluno> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
-    
-    final List<String> _titulos = [
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final List<String> titulos = [
       t.t('aluno_inicio_titulo'),
       t.t('aluno_disciplinas_titulo'),
       t.t('aluno_perfil_titulo'),
     ];
 
     return Scaffold(
-      // AppBar padrão removida/transparente pois as abas têm seus próprios cabeçalhos
+      // AppBar Comum para todas as abas
       appBar: AppBar(
-        title: Text(_titulos[_indiceAtual]), 
+        title: Text(titulos[_indiceAtual]),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -79,31 +81,45 @@ class _TelaPrincipalAlunoState extends ConsumerState<TelaPrincipalAluno> {
         ],
       ),
       
+      // Corpo que muda conforme a aba
       body: IndexedStack(
         index: _indiceAtual,
         children: _telas,
       ),
       
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _indiceAtual,
-        onTap: _onTabTapped, 
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home),
-            label: t.t('aluno_inicio_titulo'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.book_outlined),
-            activeIcon: const Icon(Icons.book),
-            label: t.t('aluno_disciplinas_titulo'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            activeIcon: const Icon(Icons.person),
-            label: t.t('aluno_perfil_titulo'),
-          ),
-        ],
+      // Menu Inferior
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _indiceAtual,
+          onTap: _onTabTapped,
+          backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+          selectedItemColor: AppColors.primaryPurple, // Usa a cor do tema
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: t.t('aluno_inicio_titulo'),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.book_outlined),
+              activeIcon: const Icon(Icons.book),
+              label: t.t('aluno_disciplinas_titulo'),
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.person_outline),
+              activeIcon: const Icon(Icons.person),
+              label: t.t('aluno_perfil_titulo'),
+            ),
+          ],
+        ),
       ),
     );
   }

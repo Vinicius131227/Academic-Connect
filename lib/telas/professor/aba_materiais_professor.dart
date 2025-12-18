@@ -3,10 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
-import 'package:intl/intl.dart'; // Formatação de data
-import 'package:url_launcher/url_launcher.dart'; // Abrir links
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../models/material_aula.dart';
 import '../../providers/provedores_app.dart';
@@ -95,7 +94,6 @@ class AbaMateriaisProfessor extends ConsumerWidget {
                     style: TextStyle(color: textColor?.withOpacity(0.7))
                   ),
                   const SizedBox(height: 8),
-                  // TRADUZIDO: "Clique no + para adicionar conteúdo"
                   Text(
                     t.t('materiais_ajuda_add'),
                     style: TextStyle(color: textColor?.withOpacity(0.5), fontSize: 12),
@@ -125,7 +123,6 @@ class AbaMateriaisProfessor extends ConsumerWidget {
                 onDismissed: (direction) {
                    // Exclui do banco
                    ref.read(servicoFirestoreProvider).removerMaterial(turma.id, material.id);
-                   // TRADUZIDO: "Material removido."
                    ScaffoldMessenger.of(context).showSnackBar(
                      SnackBar(content: Text(t.t('materiais_removido')))
                    );

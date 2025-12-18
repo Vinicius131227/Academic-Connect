@@ -4,31 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:widgetbook/widgetbook.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-// Importações de Tema e Localização
+// Imports do seu projeto
 import '../themes/app_theme.dart';
 import '../l10n/app_localizations.dart';
 
-// Importações dos Casos de Uso (Módulos)
-import 'use_cases_auth.dart';
-import 'use_cases_app.dart';
+// Importa a lista de diretórios que criamos
+import 'directories.dart';
 
-/// Função principal para rodar o Widgetbook.
-/// Execute com: flutter run -t lib/widgetbook/main.dart -d chrome
 void main() {
   runApp(const WidgetbookApp());
 }
 
-/// A classe principal do Widgetbook.
-/// Configura o ambiente de teste visual (temas, dispositivos, localização).
 class WidgetbookApp extends StatelessWidget {
   const WidgetbookApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Widgetbook.material(
-      // --- 1. ADDONS (Ferramentas Laterais) ---
+      // Passamos a lista de telas
+      directories: directories,
+      
       addons: [
-        // Troca de Tema (Claro / Escuro)
+        // 1. TEMA
         MaterialThemeAddon(
           themes: [
             WidgetbookTheme(name: 'Claro', data: AppTheme.lightTheme),
@@ -36,7 +33,7 @@ class WidgetbookApp extends StatelessWidget {
           ],
         ),
 
-        // Troca de Idioma (PT / EN / ES)
+        // 2. LOCALIZAÇÃO (Correção do erro de Assert)
         LocalizationAddon(
           locales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
@@ -45,37 +42,21 @@ class WidgetbookApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          initialLocale: const Locale('pt'),
+          // Pega o primeiro idioma 'pt' da lista real gerada pelo Flutter
+          initialLocale: AppLocalizations.supportedLocales.firstWhere(
+            (loc) => loc.languageCode == 'pt',
+            orElse: () => AppLocalizations.supportedLocales.first,
+          ),
         ),
 
-        // Simulação de Dispositivos
+        // 3. DISPOSITIVO (Frame de celular)
         DeviceFrameAddon(
           devices: [
             Devices.ios.iPhone13,
             Devices.ios.iPadPro11Inches,
             Devices.android.samsungGalaxyS20,
-            Devices.macOS.macBookPro,
           ],
-        ),
-        
-        // Escala de Texto (Acessibilidade)
-        TextScaleAddon(
-          scales: [1.0, 1.5, 2.0],
-        ),
-      ],
-
-      // --- 2. DIRETÓRIOS (Menu Lateral) ---
-      directories: [
-        // Categoria: Autenticação (Login, Cadastro...)
-        WidgetbookCategory(
-          name: 'Autenticação',
-          children: authUseCases, // Importado de use_cases_auth.dart
-        ),
-
-        // Categoria: Aplicação Principal (Aluno, Prof, CA...)
-        WidgetbookCategory(
-          name: 'Aplicação',
-          children: appUseCases, // Importado de use_cases_app.dart
+          initialDevice: Devices.ios.iPhone13,
         ),
       ],
     );

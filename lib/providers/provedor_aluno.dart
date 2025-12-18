@@ -1,4 +1,3 @@
-// lib/providers/provedor_aluno.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,10 +8,8 @@ import 'provedor_autenticacao.dart';
 
 // --- LÓGICA DE CADASTRO DE NFC DO ALUNO ---
 
-/// Enum para os diferentes estados da tela de cadastro de NFC
 enum StatusCadastroNFC { idle, scanning, success, error, unsupported }
 
-/// Classe que armazena o estado da tela de cadastro de NFC
 class EstadoCadastroNFC {
   final StatusCadastroNFC status;
   final String? uid;
@@ -32,28 +29,34 @@ class EstadoCadastroNFC {
     return EstadoCadastroNFC(
       status: status ?? this.status, 
       uid: uid ?? this.uid, 
-      erro: erro ?? this.erro
+      erro: erro 
     );
   }
 }
 
-/// Notificador para gerenciar o estado do cadastro de NFC
 class NotificadorCadastroNFC extends StateNotifier<EstadoCadastroNFC> {
   final Ref _ref;
   NotificadorCadastroNFC(this._ref) : super(EstadoCadastroNFC());
   
   /// Inicia a varredura por um cartão NFC
   Future<void> iniciarLeitura() async {
-    NFCAvailability availability = await FlutterNfcKit.nfcAvailability;
-    if (availability != NFCAvailability.available) {
-      state = state.copyWith(status: StatusCadastroNFC.unsupported, erro: 'NFC não disponível neste dispositivo.');
-      return;
+    // 1. Verifica disponibilidade
+    try {
+      NFCAvailability availability = await FlutterNfcKit.nfcAvailability;
+      if (availability != NFCAvailability.available) {
+        state = state.copyWith(status: StatusCadastroNFC.unsupported, erro: 'NFC não disponível.');
+        return;
+      }
+    } catch(e) {
+       state = state.copyWith(status: StatusCadastroNFC.unsupported, erro: 'Erro ao verificar NFC: $e');
+       return;
     }
 
     state = state.copyWith(status: StatusCadastroNFC.scanning, erro: null, uid: null);
     
     NFCTag? tag;
     try {
+      // 2. Aguarda o Cartão
       tag = await FlutterNfcKit.poll(
           timeout: const Duration(seconds: 20),
           readIso14443A: true,
@@ -62,30 +65,66 @@ class NotificadorCadastroNFC extends StateNotifier<EstadoCadastroNFC> {
         );
         
       HapticFeedback.mediumImpact(); 
-      final uid = tag.id.replaceAll(' ', ':').toUpperCase(); 
+      final uidLido = tag.id.replaceAll(' ', ':').toUpperCase(); 
 
-      if (uid.isNotEmpty) {
-        _ref.read(ttsProvider).speak("Cartão lido com sucesso.");
-        state = state.copyWith(status: StatusCadastroNFC.success, uid: uid);
+      if (uidLido.isNotEmpty) {
+        await _validarDuplicidadeImediata(uidLido);
       } else {
-        _ref.read(ttsProvider).speak("Erro na leitura, tente novamente.");
-        state = state.copyWith(status: StatusCadastroNFC.error, erro: 'Não foi possível ler o UID do cartão.');
+        _ref.read(ttsProvider).speak("Erro na leitura.");
+        state = state.copyWith(status: StatusCadastroNFC.error, erro: 'Não foi possível ler o UID.');
       }
     } catch (e) {
         if (e.toString().contains("unavailable")) {
-          state = state.copyWith(status: StatusCadastroNFC.unsupported, erro: 'NFC indisponível. Verifique as configurações.');
+          state = state.copyWith(status: StatusCadastroNFC.unsupported, erro: 'NFC indisponível.');
         } else if (e.toString().contains("timeout")) {
-          state = state.copyWith(status: StatusCadastroNFC.idle, erro: 'Tempo de leitura esgotado.');
+          state = state.copyWith(status: StatusCadastroNFC.idle, erro: 'Tempo esgotado.');
         } else {
-          state = state.copyWith(status: StatusCadastroNFC.error, erro: 'Erro ao processar: $e');
+          state = state.copyWith(status: StatusCadastroNFC.error, erro: 'Erro: $e');
           _ref.read(ttsProvider).speak("Erro ao processar.");
         }
     } finally {
-        await FlutterNfcKit.finish();
+        await FlutterNfcKit.finish().catchError((_){});
     }
   }
 
-  /// Salva o UID do cartão lido no perfil do usuário no Firebase
+  /// Verifica no banco SE O CARTÃO JÁ EXISTE antes de deixar o usuário prosseguir
+  Future<void> _validarDuplicidadeImediata(String uidLido) async {
+    try {
+      final servico = _ref.read(servicoFirestoreProvider);
+      final usuarioAtual = _ref.read(provedorNotificadorAutenticacao).usuario;
+      
+      // Busca se alguém tem esse cartão
+      final usuarioDono = await servico.getAlunoPorNFC(uidLido);
+
+      // Se achou alguém E não sou eu mesmo
+      if (usuarioDono != null && usuarioDono.uid != usuarioAtual?.uid) {
+         // ERRO: DUPLICADO
+         String msgErro = "Este cartão já pertence a outra pessoa.";
+         
+         // Tenta pegar o nome para ser mais específico
+         if (usuarioDono.alunoInfo != null) {
+           msgErro = "Cartão já cadastrado para ${usuarioDono.alunoInfo!.nomeCompleto}.";
+         }
+         
+         _ref.read(ttsProvider).speak("Erro. Cartão repetido."); // Fala o erro
+         
+         state = state.copyWith(
+           status: StatusCadastroNFC.error, 
+           uid: uidLido,
+           erro: msgErro
+         );
+      } else {
+         // SUCESSO: Cartão livre ou é meu mesmo
+         _ref.read(ttsProvider).speak("Cartão lido com sucesso.");
+         state = state.copyWith(status: StatusCadastroNFC.success, uid: uidLido);
+      }
+    } catch (e) {
+      // Erro de conexão ou outro
+      state = state.copyWith(status: StatusCadastroNFC.error, erro: "Erro ao validar cartão: $e");
+    }
+  }
+
+  /// Salva efetivamente (agora é seguro pois já validamos antes)
   Future<void> salvarCartao(String uidNfc) async {
     final usuarioAtual = _ref.read(provedorNotificadorAutenticacao).usuario;
     if (usuarioAtual == null) return; 
@@ -93,27 +132,25 @@ class NotificadorCadastroNFC extends StateNotifier<EstadoCadastroNFC> {
     final servico = _ref.read(servicoFirestoreProvider);
     
     try {
-      // 1. Salva no banco
       await servico.salvarCartaoNFC(usuarioAtual.uid, uidNfc);
       
-      // 2. Cria uma cópia local atualizada do usuário
       final usuarioAtualizado = usuarioAtual.copyWith(nfcCardId: uidNfc);
-
-      // 3. Atualiza o estado de autenticação global com o novo usuário
       _ref.read(provedorNotificadorAutenticacao.notifier).state = 
-          _ref.read(provedorNotificadorAutenticacao).copyWith(
-            usuario: usuarioAtualizado
-          );
+          _ref.read(provedorNotificadorAutenticacao).copyWith(usuario: usuarioAtualizado);
       
-      _ref.read(ttsProvider).speak("Cartão salvo com sucesso.");
+      _ref.read(ttsProvider).speak("Salvo com sucesso.");
       
     } catch (e) {
-      debugPrint("Erro ao salvar cartão: $e");
-       _ref.read(ttsProvider).speak("Erro ao salvar o cartão.");
+      debugPrint("Erro ao salvar: $e");
+      _ref.read(ttsProvider).speak("Erro ao salvar.");
+      state = EstadoCadastroNFC(
+        status: StatusCadastroNFC.error,
+        uid: uidNfc,
+        erro: e.toString().replaceAll('Exception: ', ''),
+      );
     }
   }
 
-  /// Reseta o estado do provedor para o inicial
   void reset() {
     FlutterNfcKit.finish().catchError((_) {});
     state = EstadoCadastroNFC();
@@ -126,7 +163,6 @@ class NotificadorCadastroNFC extends StateNotifier<EstadoCadastroNFC> {
   }
 }
 
-/// O provedor que a tela [TelaCadastroNFC] vai usar
 final provedorCadastroNFC =
     StateNotifierProvider<NotificadorCadastroNFC, EstadoCadastroNFC>(
   (ref) => NotificadorCadastroNFC(ref),

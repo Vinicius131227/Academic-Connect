@@ -8,10 +8,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../models/usuario.dart'; 
-import '../../models/prova_agendada.dart'; // Necessário para tipagem
+import '../../models/prova_agendada.dart'; 
 import '../../l10n/app_localizations.dart';
 import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
@@ -19,8 +18,6 @@ import '../../providers/provedor_mapas.dart';
 import '../../services/servico_firestore.dart';
 import '../comum/widget_carregamento.dart';
 import '../../themes/app_theme.dart';
-
-// Telas de navegação
 import '../comum/aba_chat_disciplina.dart';
 import 'aba_materiais_aluno.dart';
 
@@ -103,7 +100,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
               // Data e Hora
               _buildDetailRow(
                 Icons.access_time, 
-                "Data e Hora", 
+                t.t('lbl_data_hora'),
                 DateFormat("dd/MM/yyyy 'às' HH:mm").format(prova.dataHora), 
                 textColor, subTextColor
               ),
@@ -112,8 +109,8 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
               // Conteúdo
               _buildDetailRow(
                 Icons.menu_book, 
-                "Conteúdo", 
-                prova.conteudo.isEmpty ? "Não informado" : prova.conteudo, 
+                t.t('lbl_conteudo'),
+                prova.conteudo.isEmpty ? t.t('lbl_nao_informado') : prova.conteudo,
                 textColor, subTextColor
               ),
               const SizedBox(height: 16),
@@ -128,7 +125,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Local", style: TextStyle(color: subTextColor, fontSize: 12)),
+                        Text(t.t('lbl_local'), style: TextStyle(color: subTextColor, fontSize: 12)), // Traduzido
                         const SizedBox(height: 4),
                         Text("${prova.predio} - ${prova.sala}", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
@@ -139,7 +136,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                     onPressed: () {
                       Navigator.pop(ctx); 
                       servicoMapas.abrirLocalizacao(prova.predio).catchError((e) {
-                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
                       });
                     },
                     icon: const Icon(Icons.map, color: AppColors.primaryPurple),
@@ -242,7 +239,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      prof?.alunoInfo?.nomeCompleto ?? "Professor", 
+                                      prof?.alunoInfo?.nomeCompleto ?? t.t('lbl_professor_fallback'), // Traduzido
                                       style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16)
                                     ),
                                     if (prof?.email != null)
@@ -321,7 +318,7 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                           onPressed: () {
                             final nomePredio = _extrairNomePredio(turma.local);
                             servicoMapas.abrirLocalizacao(nomePredio).catchError((e) {
-                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
                             });
                           },
                           icon: const Icon(Icons.map, size: 16, color: Colors.white),
@@ -452,7 +449,6 @@ class TelaDetalhesDisciplinaAluno extends ConsumerWidget {
                       ), 
                       title: Text(p.titulo, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)), 
                       subtitle: Text(DateFormat('dd/MM HH:mm').format(p.dataHora), style: TextStyle(color: subTextColor)),
-                      // Ação de clique adicionada
                       onTap: () => _mostrarDetalhesProva(p),
                     )
                   )).toList()
@@ -530,18 +526,18 @@ class _TelaChatIsolada extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-     final theme = Theme.of(context);
-     final textColor = theme.textTheme.bodyLarge?.color;
-     final t = AppLocalizations.of(context)!;
+      final theme = Theme.of(context);
+      final textColor = theme.textTheme.bodyLarge?.color;
+      final t = AppLocalizations.of(context)!;
 
-     return Scaffold(
-       appBar: AppBar(
-         title: Text(t.t('chat_titulo_sala', args: [nomeDisciplina]), style: TextStyle(color: textColor)),
-         iconTheme: IconThemeData(color: textColor),
-         backgroundColor: theme.scaffoldBackgroundColor,
-         elevation: 0,
-       ),
-       body: AbaChatDisciplina(turmaId: turmaId),
-     );
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.t('chat_titulo_sala', args: [nomeDisciplina]), style: TextStyle(color: textColor)),
+          iconTheme: IconThemeData(color: textColor),
+          backgroundColor: theme.scaffoldBackgroundColor,
+          elevation: 0,
+        ),
+        body: AbaChatDisciplina(turmaId: turmaId),
+      );
   }
 }

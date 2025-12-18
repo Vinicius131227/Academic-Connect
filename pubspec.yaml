@@ -49,9 +49,11 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.0
   
+  flutter_native_splash: ^2.3.3
   # PACOTES DE GERAÇÃO DE CÓDIGO
   build_runner: ^2.4.10
   widgetbook_generator: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
   # PACOTE PRINCIPAL DO WIDGETBOOK
   # (Removido das dependencies normais)
@@ -61,3 +63,23 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+flutter_native_splash:
+  color: "#FFFFFF" # Cor de fundo da tela (Branco). Mude se sua logo for branca.
+  image: "assets/images/logo.png"
+  android_12:
+    image: "assets/images/logo.png"
+    color: "#FFFFFF"
+  web: true
+
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo.png"
+  min_sdk_android: 21 # Importante para Androids mais novos
+  web:
+    generate: true
+    image_path: "assets/images/logo.png"
+    background_color: "#hex_da_sua_cor" # Ex: "#FFFFFF" ou "#6200EE"
+    theme_color: "#hex_da_sua_cor"

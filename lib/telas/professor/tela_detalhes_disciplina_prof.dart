@@ -1,14 +1,19 @@
+// lib/telas/professor/tela_detalhes_disciplina_prof.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Para Clipboard
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
+import 'package:intl/intl.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
+import '../../models/solicitacao_aluno.dart';
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
+import '../../services/servico_firestore.dart'; 
+import '../../providers/provedores_app.dart';
 import '../comum/aba_chat_disciplina.dart';
 import 'aba_materiais_professor.dart';
 import 'tela_chamada_manual.dart';
@@ -20,9 +25,8 @@ import 'tela_historico_chamadas.dart';
 import 'tela_editar_turma.dart';
 import 'tela_visualizar_alunos.dart';
 import 'tela_importar_alunos.dart'; 
-import '../../services/servico_firestore.dart'; 
+import 'dialog_detalhes_solicitacao.dart';
 
-/// Caso de uso para o Widgetbook.
 @UseCase(
   name: 'Detalhes Disciplina (Prof)',
   type: TelaDetalhesDisciplinaProf,
@@ -51,8 +55,6 @@ class TelaDetalhesDisciplinaProf extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    
-    // Cores dinâmicas
     final theme = Theme.of(context);
     final textColor = theme.textTheme.bodyLarge?.color;
     
@@ -103,16 +105,18 @@ class _AbaGestaoProfessor extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     final textColor = theme.textTheme.bodyLarge?.color;
     
-    // Cores adaptáveis
     final cardColor = isDark ? AppColors.surfaceDark : Colors.white;
     final borderColor = isDark ? Colors.white10 : Colors.black12;
+
+    // OBSERVA AS SOLICITAÇÕES
+    final asyncSolicitacoes = ref.watch(provedorStreamSolicitacoesProfessor);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- CARD DO CÓDIGO DA TURMA ---
+          // 1. CARD DO CÓDIGO DA TURMA
           InkWell(
             onTap: () {
               Clipboard.setData(ClipboardData(text: turma.turmaCode));
@@ -134,10 +138,7 @@ class _AbaGestaoProfessor extends ConsumerWidget {
                   Text(
                     t.t('prof_codigo_turma').toUpperCase(), 
                     style: GoogleFonts.poppins(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold, 
-                      color: AppColors.primaryPurple,
-                      letterSpacing: 1.2
+                      fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryPurple, letterSpacing: 1.2
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -146,14 +147,9 @@ class _AbaGestaoProfessor extends ConsumerWidget {
                     children: [
                       SelectableText(
                         turma.turmaCode,
-                        style: GoogleFonts.poppins(
-                          fontSize: 32, 
-                          fontWeight: FontWeight.bold, 
-                          color: textColor
-                        ),
+                        style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: textColor),
                       ),
                       const SizedBox(width: 12),
-                      // Ícone Copiar
                       IconButton(
                         icon: const Icon(Icons.copy, color: AppColors.primaryPurple),
                         tooltip: "Copiar Código",
@@ -164,12 +160,10 @@ class _AbaGestaoProfessor extends ConsumerWidget {
                           );
                         },
                       ),
-                      // Ícone Compartilhar
                       IconButton(
                         icon: const Icon(Icons.share, color: AppColors.primaryPurple),
                         tooltip: t.t('prof_compartilhar_convite'),
                         onPressed: () {
-                          // Link mágico + Código
                           final link = "academicconnect://entrar?codigo=${turma.turmaCode}";
                           final msg = t.t('prof_msg_convite', args: [turma.nome, turma.turmaCode]) + "\n\nLink: $link";
                           Share.share(msg);
@@ -178,17 +172,90 @@ class _AbaGestaoProfessor extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    "Toque para copiar",
-                    style: TextStyle(fontSize: 12, color: textColor?.withOpacity(0.6)),
-                  ),
+                  Text("Toque para copiar", style: TextStyle(fontSize: 12, color: textColor?.withOpacity(0.6))),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          
+          const SizedBox(height: 24),
 
-          // SEÇÃO PRESENÇA
+          // 2. SOLICITAÇÕES PENDENTES (Adaptação/Abono)
+          asyncSolicitacoes.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_,__) => const SizedBox.shrink(),
+            data: (todasSolicitacoes) {
+              // Filtra apenas solicitações DESTA turma que estão PENDENTES
+              final pendentes = todasSolicitacoes.where((s) => 
+                s.turmaId == turma.id && s.status == StatusSolicitacao.pendente
+              ).toList();
+
+              if (pendentes.isEmpty) return const SizedBox.shrink();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.notifications_active, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        t.t('prof_solicitacoes_titulo'), // "Solicitações"
+                        style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: pendentes.length,
+                    itemBuilder: (context, index) {
+                      final sol = pendentes[index];
+                      return Card(
+                        color: cardColor,
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Colors.orange, width: 1) // Borda de destaque
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.orange.withOpacity(0.1),
+                            child: const Icon(Icons.priority_high, color: Colors.orange, size: 20),
+                          ),
+                          title: Text(sol.tipo, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                          subtitle: Text(
+                            "${sol.nomeAluno} • ${DateFormat('dd/MM').format(sol.data)}", 
+                            style: TextStyle(color: textColor?.withOpacity(0.7), fontSize: 12)
+                          ),
+                          trailing: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryPurple,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            child: const Text("Ver", style: TextStyle(color: Colors.white, fontSize: 12)),
+                            onPressed: () {
+                              showDialog(
+                                context: context, 
+                                builder: (ctx) => DialogDetalhesSolicitacao(solicitacao: sol)
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              );
+            },
+          ),
+
+          // 3. SEÇÃO PRESENÇA
           _buildSectionTitle(t.t('prof_presenca'), textColor),
           const SizedBox(height: 12),
           Row(
@@ -203,7 +270,7 @@ class _AbaGestaoProfessor extends ConsumerWidget {
           
           const SizedBox(height: 24),
 
-          // SEÇÃO AVALIAÇÃO
+          // 4. SEÇÃO AVALIAÇÃO
           _buildSectionTitle(t.t('prof_avaliacao'), textColor),
           const SizedBox(height: 12),
           Row(
@@ -216,11 +283,9 @@ class _AbaGestaoProfessor extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
-          // SEÇÃO ADMINISTRAÇÃO
+          // 5. SEÇÃO ADMINISTRAÇÃO
           _buildSectionTitle(t.t('prof_admin'), textColor),
           const SizedBox(height: 12),
-           
-           // Linha 1
            Row(
             children: [
               _buildActionButton(context, t.t('prof_cadastrar_nfc'), Icons.person_add_alt_1, Colors.teal, cardColor, borderColor, textColor, () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaCadastroNfcManual(turma: turma)))),
@@ -232,7 +297,6 @@ class _AbaGestaoProfessor extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
 
-          // Linha 2 (Importar e Exportar)
           Row(
             children: [
               _buildActionButton(context, "Importar (CSV)", Icons.upload_file, Colors.green.shade800, cardColor, borderColor, textColor, () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaImportarAlunos(turmaId: turma.id, nomeDisciplina: turma.nome)))),

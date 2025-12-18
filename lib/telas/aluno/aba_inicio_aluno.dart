@@ -4,25 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http; 
-import 'dart:convert';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../providers/provedores_app.dart'; 
-import '../../providers/provedor_mapas.dart'; // IMPORTANTE: Mapas
+import '../../providers/provedor_mapas.dart'; 
 import '../../models/prova_agendada.dart'; 
 import '../../l10n/app_localizations.dart';
 import '../../themes/app_theme.dart';
 import '../comum/animacao_fadein_lista.dart'; 
 import '../comum/widget_carregamento.dart';
-
-// Telas de navegação
-import 'tela_solicitar_adaptacao.dart';
+import 'tela_solicitar_adaptacao.dart'; 
 import 'tela_drive_provas.dart'; 
 import 'tela_dicas_gerais.dart'; 
-import 'tela_calendario.dart';   
+import 'tela_calendario.dart';
+import 'tela_cadastro_nfc.dart'; 
+import 'tela_minhas_solicitacoes.dart';
 
 @UseCase(
   name: 'Home Aluno',
@@ -34,19 +31,6 @@ Widget buildAbaInicioAluno(BuildContext context) {
   );
 }
 
-final quoteProvider = FutureProvider<String>((ref) async {
-  try {
-    final response = await http.get(Uri.parse('https://api.adviceslip.com/advice'));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['slip']['advice'].toString();
-    }
-    return "Estude com dedicação!";
-  } catch (e) {
-    return "Mantenha o foco nos estudos.";
-  }
-});
-
 class AbaInicioAluno extends ConsumerWidget {
   const AbaInicioAluno({super.key});
 
@@ -57,11 +41,11 @@ class AbaInicioAluno extends ConsumerWidget {
     // Providers de dados
     final asyncTurmas = ref.watch(provedorStreamTurmasAluno);
     final asyncProvas = ref.watch(provedorStreamCalendario); 
-    final servicoMapas = ref.read(provedorMapas); // Serviço de Mapas
+    final servicoMapas = ref.read(provedorMapas); 
     
     final usuario = ref.watch(provedorNotificadorAutenticacao).usuario;
-    final asyncQuote = ref.watch(quoteProvider);
 
+    // Pega o primeiro nome para a saudação
     final nomeAluno = usuario?.alunoInfo?.nomeCompleto.split(' ')[0] ?? 'Aluno';
 
     // Tema
@@ -88,29 +72,25 @@ class AbaInicioAluno extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Matéria
               Text(prova.disciplina, style: TextStyle(color: subTextColor, fontSize: 14, fontWeight: FontWeight.bold)),
               const Divider(height: 24),
               
-              // Data e Hora
               _buildDetailRow(
                 Icons.access_time, 
-                "Data e Hora", 
+                t.t('lbl_data_hora'), 
                 DateFormat("dd/MM/yyyy 'às' HH:mm").format(prova.dataHora), 
                 textColor, subTextColor
               ),
               const SizedBox(height: 16),
 
-              // Conteúdo
               _buildDetailRow(
                 Icons.menu_book, 
-                "Conteúdo", 
-                prova.conteudo.isEmpty ? "Não informado" : prova.conteudo, 
+                t.t('lbl_conteudo'), 
+                prova.conteudo.isEmpty ? t.t('lbl_nao_informado') : prova.conteudo, 
                 textColor, subTextColor
               ),
               const SizedBox(height: 16),
 
-              // Localização com Ação de Mapa
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -120,19 +100,17 @@ class AbaInicioAluno extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Local", style: TextStyle(color: subTextColor, fontSize: 12)),
+                        Text(t.t('lbl_local'), style: TextStyle(color: subTextColor, fontSize: 12)),
                         const SizedBox(height: 4),
                         Text("${prova.predio} - ${prova.sala}", style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
-                  // Botão MAPA
                   IconButton(
                     onPressed: () {
-                      Navigator.pop(ctx); // Fecha o dialog
-                      // Chama o serviço de mapas com o nome do prédio
+                      Navigator.pop(ctx); 
                       servicoMapas.abrirLocalizacao(prova.predio).catchError((e) {
-                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
                       });
                     },
                     icon: const Icon(Icons.map, color: AppColors.primaryPurple),
@@ -155,10 +133,12 @@ class AbaInicioAluno extends ConsumerWidget {
     void _abrirDriveGlobal() {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDriveProvas()));
     }
+    
     void _abrirDicasGerais() {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaDicasGerais()));
     }
 
+    // Lista de Widgets para animação FadeIn
     final widgets = [
       // 1. CABEÇALHO
       Row(
@@ -181,18 +161,9 @@ class AbaInicioAluno extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              asyncQuote.when(
-                data: (frase) => SizedBox(
-                  width: 250, 
-                  child: Text(
-                    '"$frase"', 
-                    style: TextStyle(fontSize: 12, color: subTextColor, fontStyle: FontStyle.italic), 
-                    maxLines: 2, 
-                    overflow: TextOverflow.ellipsis
-                  )
-                ),
-                loading: () => Text(t.t('carregando'), style: TextStyle(fontSize: 12, color: subTextColor)),
-                error: (_, __) => Text(t.t('inicio_subtitulo'), style: TextStyle(fontSize: 12, color: subTextColor)),
+              Text(
+                t.t('inicio_subtitulo'), 
+                style: TextStyle(fontSize: 14, color: subTextColor),
               ),
             ],
           ),
@@ -210,7 +181,7 @@ class AbaInicioAluno extends ConsumerWidget {
 
       const SizedBox(height: 24),
 
-      // 3. ACESSO RÁPIDO
+      // 2. ACESSO RÁPIDO
       Text(
         t.t('inicio_acesso_rapido'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
@@ -221,19 +192,127 @@ class AbaInicioAluno extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Drive
           Expanded(child: _buildCategoryItem(context, icon: Icons.folder_shared_outlined, label: t.t('card_drive'), color: const Color(0xFFFFF3E0), iconColor: Colors.orange, textColor: subTextColor, onTap: _abrirDriveGlobal)),
           const SizedBox(width: 8),
-          Expanded(child: _buildCategoryItem(context, icon: Icons.lightbulb_outline, label: t.t('card_dicas'), color: const Color(0xFFE3F2FD), iconColor: Colors.blue, textColor: subTextColor, onTap: _abrirDicasGerais)),
+          
+          // Solicitar Adaptação
+          Expanded(
+            child: _buildCategoryItem(
+              context, 
+              icon: Icons.accessibility_new, 
+              label: t.t('card_adaptacao'), 
+              color: const Color(0xFFF3E5F5), 
+              iconColor: Colors.purple, 
+              textColor: subTextColor, 
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSolicitarAdaptacao()))
+            )
+          ),
           const SizedBox(width: 8),
-          Expanded(child: _buildCategoryItem(context, icon: Icons.accessibility_new, label: t.t('card_adaptacao'), color: const Color(0xFFF3E5F5), iconColor: Colors.purple, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaSolicitarAdaptacao())))),
+          
+          // Meus Pedidos (NOVO)
+          Expanded(
+            child: _buildCategoryItem(
+              context, 
+              icon: Icons.checklist_rtl, 
+              label: "Meus Pedidos", 
+              color: const Color(0xFFE3F2FD), 
+              iconColor: Colors.blue, 
+              textColor: subTextColor, 
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaMinhasSolicitacoes()))
+            )
+          ),
+          
           const SizedBox(width: 8),
-          Expanded(child: _buildCategoryItem(context, icon: Icons.calendar_month, label: t.t('card_calendario'), color: const Color(0xFFE8F5E9), iconColor: Colors.green, textColor: subTextColor, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCalendario())))),
+          
+          Expanded(
+            child: _buildCategoryItem(
+              context, 
+              icon: Icons.lightbulb_outline, 
+              label: t.t('card_dicas'), 
+              color: const Color(0xFFE8F5E9), 
+              iconColor: Colors.green, 
+              textColor: subTextColor, 
+              onTap: _abrirDicasGerais
+            )
+          ),
         ],
+      ),
+
+      const SizedBox(height: 24),
+
+      // 3. BANNER DE CADASTRO NFC
+      Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.primaryPurple, Color(0xFF7E57C2)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryPurple.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaCadastroNFC()));
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.nfc, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          t.t('nfc_cadastro_titulo'), 
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          t.t('inicio_configurar_nfc'), 
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
 
       const SizedBox(height: 32),
 
-      // 4. PRÓXIMAS AVALIAÇÕES (COM CLIQUE)
+      // 4. PRÓXIMAS AVALIAÇÕES (Calendário Inline)
       Text(
         t.t('inicio_proximas_avaliacoes'), 
         style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)
@@ -244,7 +323,6 @@ class AbaInicioAluno extends ConsumerWidget {
         loading: () => const WidgetCarregamento(texto: ''),
         error: (_,__) => const SizedBox.shrink(),
         data: (turmas) {
-          
           final meusIds = turmas.map((t) => t.id).toSet();
 
           return asyncProvas.when(
@@ -252,11 +330,16 @@ class AbaInicioAluno extends ConsumerWidget {
             error: (e,s) => const SizedBox.shrink(),
             data: (todasProvas) {
               
+              // --- FILTRO DE DATA ---
+              final agora = DateTime.now();
+              
               final minhasProvas = todasProvas.where((p) {
-                 return meusIds.contains(p.turmaId) && 
-                        p.dataHora.isAfter(DateTime.now().subtract(const Duration(days: 1)));
+                  final ehMinhaTurma = meusIds.contains(p.turmaId);
+                  final ehFutura = p.dataHora.isAfter(agora);
+                  return ehMinhaTurma && ehFutura;
               }).toList();
 
+              // Ordena para mostrar a mais próxima primeiro
               minhasProvas.sort((a,b) => a.dataHora.compareTo(b.dataHora));
               
               if (minhasProvas.isEmpty) {
@@ -270,7 +353,6 @@ class AbaInicioAluno extends ConsumerWidget {
               
               return Column(
                 children: minhasProvas.take(3).map((prova) => 
-                  // Adicionado GestureDetector para clique
                   GestureDetector(
                     onTap: () => _mostrarDetalhesProva(prova),
                     child: _buildResultCard(prova, cardColor, textColor, subTextColor)

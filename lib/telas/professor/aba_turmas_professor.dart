@@ -5,15 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
 import '../../providers/provedores_app.dart';
-import '../../l10n/app_localizations.dart'; // Traduções
-import '../../themes/app_theme.dart'; // Cores
-import '../comum/widget_carregamento.dart'; // Loading
-import '../comum/animacao_fadein_lista.dart'; // Animação
-import 'tela_criar_turma.dart'; // Tela de Criação
-import 'tela_detalhes_disciplina_prof.dart'; // Hub da Disciplina
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
+import '../comum/widget_carregamento.dart';
+import '../comum/animacao_fadein_lista.dart';
+import 'tela_criar_turma.dart';
+import 'tela_detalhes_disciplina_prof.dart';
 
 /// Caso de uso para o Widgetbook.
 /// Simula a aba de turmas com dados fictícios.

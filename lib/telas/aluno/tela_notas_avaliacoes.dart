@@ -5,15 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedores_app.dart';
 import '../../providers/provedor_autenticacao.dart';
 import '../comum/widget_carregamento.dart';
-import '../../models/disciplina_notas.dart'; // Modelo de notas
-import '../../models/prova_agendada.dart'; // Modelo de provas
-import '../../providers/provedor_mapas.dart'; // Para abrir mapa
-import '../../l10n/app_localizations.dart'; // Traduções
-import '../../themes/app_theme.dart'; // Cores
+import '../../models/disciplina_notas.dart';
+import '../../models/prova_agendada.dart';
+import '../../providers/provedor_mapas.dart';
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
 
 /// Caso de uso para o Widgetbook.
 @UseCase(

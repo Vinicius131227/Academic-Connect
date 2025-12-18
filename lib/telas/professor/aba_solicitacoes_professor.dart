@@ -6,13 +6,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedores_app.dart';
 import '../../models/solicitacao_aluno.dart';
-import '../../l10n/app_localizations.dart'; // Traduções
-import '../../themes/app_theme.dart'; // Cores
-import '../comum/widget_carregamento.dart'; // Loading
-import 'dialog_detalhes_solicitacao.dart'; // Modal de Detalhes
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
+import '../comum/widget_carregamento.dart';
+import 'dialog_detalhes_solicitacao.dart'; 
 
 /// Caso de uso para o Widgetbook.
 @UseCase(

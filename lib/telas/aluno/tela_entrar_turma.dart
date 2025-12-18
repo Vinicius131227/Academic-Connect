@@ -5,10 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../services/servico_firestore.dart';
-import '../../l10n/app_localizations.dart'; // Certifique-se que o caminho está correto
+import '../../l10n/app_localizations.dart';
 import '../comum/overlay_carregamento.dart'; 
 
 /// Caso de uso para o Widgetbook.
@@ -109,7 +108,7 @@ class _TelaEntrarTurmaState extends ConsumerState<TelaEntrarTurma> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Texto de instrução CORRIGIDO
+              // Texto de instrução
               Text(
                 t.t('entrar_turma_instrucao'),
                 style: TextStyle(color: isDark ? Colors.white70 : Colors.black54),

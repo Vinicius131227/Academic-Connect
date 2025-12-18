@@ -1,6 +1,9 @@
+// lib/providers/provedor_professor.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_nfc_kit/flutter_nfc_kit.dart'; 
 
 // Importações internas
 import '../models/turma_professor.dart';
@@ -13,11 +16,12 @@ import 'provedor_tts.dart';
 // =============================================================================
 
 final provedorStreamTurmasProfessor = StreamProvider.autoDispose<List<TurmaProfessor>>((ref) {
+  // Placeholder caso precise localmente
   return const Stream.empty(); 
 });
 
 // =============================================================================
-// 2. LÓGICA DE PRÉ-CHAMADA
+// 2. LÓGICA DE PRÉ-CHAMADA (COM BLOQUEIO DE HORÁRIO)
 // =============================================================================
 
 class EstadoPreChamada {
@@ -30,7 +34,19 @@ class EstadoPreChamada {
 }
 
 final provedorPreChamada = FutureProvider.family<EstadoPreChamada, TurmaProfessor>((ref, turma) async {
+  // --- MODO LIVRE ATIVADO PARA TESTES ---
   return EstadoPreChamada(podeChamar: true, creditos: turma.creditos);
+
+  /* LÓGICA ORIGINAL (COMENTADA PARA TESTE):
+  if (!turma.estaNoHorarioDeAula()) {
+    return EstadoPreChamada(
+      podeChamar: false,
+      bloqueioMensagem: "Fora do horário de aula.\n(${turma.horaInicio} - ${turma.horaFim})",
+      creditos: turma.creditos
+    );
+  }
+  return EstadoPreChamada(podeChamar: true, creditos: turma.creditos);
+  */
 });
 
 // =============================================================================
@@ -82,24 +98,62 @@ class NotificadorChamadaManual extends StateNotifier<EstadoChamadaManual> {
       debugPrint("Erro ao carregar alunos: $e");
     }
   }
+}
+
+final provedorChamadaManual = StateNotifierProvider.autoDispose.family<NotificadorChamadaManual, EstadoChamadaManual, String>((ref, turmaId) {
+    final servico = ref.watch(servicoFirestoreProvider);
+    return NotificadorChamadaManual(servico, turmaId);
+});
+
+// =============================================================================
+// 4. CHAMADA NFC (COM VALIDAÇÃO E TTS)
+// =============================================================================
+enum StatusCadastroNFC { idle, scanning, success, error }
+
+class EstadoCadastroNFC {
+  final StatusCadastroNFC status;
+  final String? uid;
+  final String? erro;
   
-  void reset() {
-    state = EstadoChamadaManual(alunos: [], totalAlunos: 0, status: StatusChamadaManual.ocioso);
+  EstadoCadastroNFC({this.status = StatusCadastroNFC.idle, this.uid, this.erro});
+
+  EstadoCadastroNFC copyWith({StatusCadastroNFC? status, String? uid, String? erro}) {
+    return EstadoCadastroNFC(
+      status: status ?? this.status,
+      uid: uid ?? this.uid,
+      erro: erro ?? this.erro,
+    );
   }
 }
 
-final provedorChamadaManual = StateNotifierProvider.autoDispose.family<
-  NotificadorChamadaManual, EstadoChamadaManual, String
->(
-  (ref, turmaId) {
-    final servico = ref.watch(servicoFirestoreProvider);
-    return NotificadorChamadaManual(servico, turmaId);
-  }
-);
+// Notificador Simples para Cadastro (usado na tela de cadastro manual)
+class NotificadorCadastroNFC extends StateNotifier<EstadoCadastroNFC> {
+  NotificadorCadastroNFC() : super(EstadoCadastroNFC());
 
-// =============================================================================
-// 4. CHAMADA NFC (STUB COMPATÍVEL)
-// =============================================================================
+  Future<void> iniciarLeitura() async {
+    state = state.copyWith(status: StatusCadastroNFC.scanning, erro: null);
+    try {
+      NFCTag tag = await FlutterNfcKit.poll(timeout: const Duration(seconds: 10));
+      String id = tag.id.replaceAll(' ', ':').toUpperCase();
+      state = state.copyWith(status: StatusCadastroNFC.success, uid: id);
+    } catch (e) {
+      state = state.copyWith(status: StatusCadastroNFC.error, erro: e.toString());
+    } finally {
+      try { await FlutterNfcKit.finish(); } catch(_){}
+    }
+  }
+
+  void pausarLeitura() {
+    try { FlutterNfcKit.finish(); } catch(_){}
+    state = state.copyWith(status: StatusCadastroNFC.idle);
+  }
+
+  void reset() => state = EstadoCadastroNFC();
+}
+
+final provedorCadastroNFC = StateNotifierProvider<NotificadorCadastroNFC, EstadoCadastroNFC>((ref) {
+  return NotificadorCadastroNFC();
+});
 
 enum StatusNFC { pausado, lendo, indisponivel, erro }
 
@@ -114,52 +168,121 @@ class EstadoPresencaNFC {
   final StatusNFC status;
   final List<AlunoPresenteNFC> presentes;
   final String? ultimoErroScan;
-  final String? ultimoAluno; // Adicionado para corrigir erro
-
-  // Getter de compatibilidade: se a UI pede .erro, retornamos .ultimoErroScan
-  String? get erro => ultimoErroScan;
+  final String? ultimoAluno; 
 
   EstadoPresencaNFC({
     this.status = StatusNFC.pausado, 
     this.presentes = const [], 
     this.ultimoErroScan,
-    this.ultimoAluno, // Adicionado
+    this.ultimoAluno,
   });
   
   EstadoPresencaNFC copyWith({
     StatusNFC? status, 
     List<AlunoPresenteNFC>? presentes, 
     String? ultimoErroScan,
-    String? ultimoAluno, // Adicionado
+    String? ultimoAluno,
   }) {
     return EstadoPresencaNFC(
       status: status ?? this.status, 
       presentes: presentes ?? this.presentes, 
-      ultimoErroScan: ultimoErroScan ?? this.ultimoErroScan,
-      ultimoAluno: ultimoAluno ?? this.ultimoAluno, // Adicionado
+      ultimoErroScan: ultimoErroScan, 
+      ultimoAluno: ultimoAluno ?? this.ultimoAluno,
     );
   }
 }
 
 class NotificadorPresencaNFC extends StateNotifier<EstadoPresencaNFC> {
   final Ref _ref;
+  bool _isPolling = false;
   
   NotificadorPresencaNFC(this._ref) : super(EstadoPresencaNFC());
   
-  Future<void> iniciarLeitura(String turmaId) async {
-    // Mantém desativado para evitar crash
-    state = state.copyWith(status: StatusNFC.indisponivel, ultimoErroScan: "NFC desativado temporariamente.");
+  Future<void> iniciarLeitura(String turmaId, List<String> alunosInscritosIds) async {
+    if (_isPolling || state.status == StatusNFC.lendo) return; 
+    _isPolling = true;
+    
+    try {
+      NFCAvailability availability = await FlutterNfcKit.nfcAvailability;
+      if (availability != NFCAvailability.available) {
+        state = state.copyWith(status: StatusNFC.indisponivel, ultimoErroScan: 'NFC Desativado');
+        _isPolling = false;
+        return;
+      }
+    } catch(e) {
+      state = state.copyWith(status: StatusNFC.indisponivel, ultimoErroScan: 'Erro: $e');
+      _isPolling = false;
+      return;
+    }
+    
+    state = state.copyWith(status: StatusNFC.lendo, ultimoErroScan: null);
+    _ref.read(ttsProvider).speak("Leitura iniciada.");
+
+    while (state.status == StatusNFC.lendo) {
+      try {
+        NFCTag tag = await FlutterNfcKit.poll(timeout: const Duration(seconds: 5));
+        String uidNfc = tag.id.replaceAll(' ', ':').toUpperCase();
+        
+        final servico = _ref.read(servicoFirestoreProvider);
+        final aluno = await servico.getAlunoPorNFC(uidNfc);
+        final hora = DateFormat('HH:mm').format(DateTime.now());
+
+        if (aluno != null && aluno.alunoInfo != null) {
+          final nome = aluno.alunoInfo!.nomeCompleto;
+          
+          if (!alunosInscritosIds.contains(aluno.uid)) {
+             _ref.read(ttsProvider).speak("Erro. Aluno de outra turma.");
+             state = state.copyWith(ultimoErroScan: "Aluno de outra turma: $nome");
+          } 
+          else if (state.presentes.any((a) => a.uid == aluno.uid)) {
+             // Já leu, ignora
+          } 
+          else {
+            _ref.read(ttsProvider).speak("Presença de $nome");
+            
+            // Salva no banco assim que lê
+            await servico.salvarPresenca(
+              turmaId, 
+              'inicio', 
+              [...state.presentes.map((a)=>a.uid), aluno.uid], // Lista atual + novo
+              DateTime.now()
+            );
+
+            state = state.copyWith(
+              presentes: [...state.presentes, AlunoPresenteNFC(uid: aluno.uid, nome: nome, hora: hora)],
+              ultimoAluno: "$nome registrado!",
+              ultimoErroScan: null 
+            );
+          }
+        } else {
+          _ref.read(ttsProvider).speak("Cartão não reconhecido.");
+          state = state.copyWith(ultimoErroScan: "Cartão desconhecido ($uidNfc)");
+        }
+      } catch (e) {
+        if (!e.toString().contains("timeout")) {
+           debugPrint("Erro leitura NFC: $e");
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
+    _isPolling = false;
+    try { await FlutterNfcKit.finish(); } catch(_){}
   }
 
   void pausarLeitura() {
     state = state.copyWith(status: StatusNFC.pausado);
+    try { FlutterNfcKit.finish(); } catch(_){}
   }
 
   Future<void> salvarChamadaNFC(String turmaId, String tipoChamada, DateTime dataChamada) async {
-    // Lógica vazia
+    final presentesUids = state.presentes.map((a) => a.uid).toList();
+    await _ref.read(servicoFirestoreProvider).salvarPresenca(turmaId, tipoChamada, presentesUids, dataChamada);
+    pausarLeitura();
+    state = EstadoPresencaNFC();
   }
   
   void reset() {
+    pausarLeitura();
     state = EstadoPresencaNFC();
   }
 }
@@ -197,14 +320,3 @@ class NotasNotifier extends StateNotifier<Map<String, double?>> {
 final provedorNotas = StateNotifierProvider<NotasNotifier, Map<String, double?>>((ref) {
   return NotasNotifier(ref);
 });
-
-// =============================================================================
-// 6. CHAMADA DIÁRIA (Controle Simples)
-// =============================================================================
-
-class ChamadaDiariaNotifier extends StateNotifier<Set<String>> {
-  ChamadaDiariaNotifier() : super({});
-  bool contains(String id) => state.contains(id);
-  void iniciarChamada(String id) => state = {...state, id};
-}
-final provedorChamadaDiaria = StateNotifierProvider<ChamadaDiariaNotifier, Set<String>>((ref) => ChamadaDiariaNotifier());

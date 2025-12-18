@@ -1,15 +1,15 @@
 // lib/services/servico_firestore.dart
 
-import 'dart:io'; 
-import 'dart:math'; 
+import 'dart:io';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart'; 
-import 'package:csv/csv.dart'; // NOVO
-import 'package:path_provider/path_provider.dart'; // NOVO
-import 'package:share_plus/share_plus.dart'; // NOVO
+import 'package:intl/intl.dart';
+import 'package:csv/csv.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
-// --- Importação dos Modelos de Dados ---
 import '../models/usuario.dart';
 import '../models/aluno_info.dart';
 import '../models/turma_professor.dart';
@@ -22,7 +22,6 @@ import '../models/material_aula.dart';
 import '../models/dica_aluno.dart';
 import '../models/pasta_drive.dart';
 
-/// Classe responsável por toda a comunicação com o Firebase Firestore.
 class ServicoFirestore {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -54,11 +53,37 @@ class ServicoFirestore {
   }
 
   Future<void> salvarCartaoNFC(String uid, String nfcId) async {
+    // 1. Verifica duplicidade
+    final query = await _db
+        .collection('usuarios')
+        .where('nfcCardId', isEqualTo: nfcId)
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      final usuarioExistente = query.docs.first;
+      
+      // Se o cartão já existe e o dono NÃO é o usuário atual (uid)
+      if (usuarioExistente.id != uid) {
+        String nomeDono = "outro usuário";
+        try {
+           final dados = usuarioExistente.data();
+           if (dados.containsKey('alunoInfo') && dados['alunoInfo'] != null) {
+             nomeDono = dados['alunoInfo']['nomeCompleto'] ?? "um aluno";
+           } else if (dados.containsKey('professorInfo') && dados['professorInfo'] != null) {
+             nomeDono = dados['professorInfo']['nome'] ?? "um professor";
+           }
+        } catch (_) {}
+
+        throw Exception("Este cartão já está cadastrado para $nomeDono.");
+      }
+    }
+
     await _db.collection('usuarios').doc(uid).update({'nfcCardId': nfcId});
   }
 
   // ===========================================================================
-  // 2. MÉTODOS DE CONSULTA (AUXILIARES)
+  // 2. MÉTODOS DE CONSULTA (ALUNOS E TURMAS)
   // ===========================================================================
 
   Future<UsuarioApp?> getAlunoPorNFC(String nfcId) async {
@@ -73,64 +98,146 @@ class ServicoFirestore {
     return UsuarioApp.fromSnapshot(query.docs.first as DocumentSnapshot<Map<String, dynamic>>);
   }
 
+  // --- LEITURA DE ALUNOS ---
   Future<List<AlunoChamada>> getAlunosDaTurma(String turmaId) async {
-    final turmaDoc = await _db.collection('turmas').doc(turmaId).get();
-    if (!turmaDoc.exists) return [];
+    try {
+      final turmaDoc = await _db.collection('turmas').doc(turmaId).get();
+      if (!turmaDoc.exists) return [];
 
-    final turmaData = turmaDoc.data() as Map<String, dynamic>;
-    
-    // 1. Alunos que já têm conta (UID)
-    final List<String> alunoUids = List<String>.from(turmaData['alunosInscritos'] ?? []);
-    
-    // 2. Alunos da planilha (Pré-cadastrados)
-    final List<Map<String, dynamic>> preCadastrados = List<Map<String, dynamic>>.from(turmaData['alunosPreCadastrados'] ?? []);
+      final turmaData = turmaDoc.data() as Map<String, dynamic>;
+      
+      // 1. IDs dos alunos inscritos
+      final List<String> alunoUids = List<String>.from(turmaData['alunosInscritos'] ?? []);
+      
+      // 2. Dados dos alunos pré-cadastrados (via CSV)
+      final List<Map<String, dynamic>> preCadastrados = List<Map<String, dynamic>>.from(turmaData['alunosPreCadastrados'] ?? []);
 
-    List<AlunoChamada> alunos = [];
+      List<AlunoChamada> alunos = [];
 
-    // Adiciona os inscritos reais
-    for (String uid in alunoUids) {
-        final doc = await _db.collection('usuarios').doc(uid).get();
-        if (doc.exists) {
-          final user = UsuarioApp.fromSnapshot(doc as DocumentSnapshot<Map<String, dynamic>>);
-          if (user.alunoInfo != null) {
-            alunos.add(AlunoChamada(
-              id: user.uid, 
-              nome: user.alunoInfo!.nomeCompleto,
-              ra: user.alunoInfo!.ra,
-            ));
+      // OTIMIZAÇÃO: Busca alunos em lotes de 10 para evitar N leituras separadas
+      if (alunoUids.isNotEmpty) {
+        for (var i = 0; i < alunoUids.length; i += 10) {
+          final fim = (i + 10 < alunoUids.length) ? i + 10 : alunoUids.length;
+          final loteIds = alunoUids.sublist(i, fim);
+
+          final querySnapshot = await _db
+              .collection('usuarios')
+              .where(FieldPath.documentId, whereIn: loteIds)
+              .get();
+
+          for (var doc in querySnapshot.docs) {
+             final user = UsuarioApp.fromSnapshot(doc as DocumentSnapshot<Map<String, dynamic>>);
+             
+             // Tenta pegar nome do aluno, ou do professor (se for monitor/híbrido), ou fallback
+             final nome = user.alunoInfo?.nomeCompleto ?? 
+                          user.professorInfo?['nome'] ?? 
+                          'Sem Nome';
+                          
+             final ra = user.alunoInfo?.ra ?? 'S/ RA';
+             
+             alunos.add(AlunoChamada(id: user.uid, nome: nome, ra: ra));
           }
         }
-    }
+      }
 
-    // Adiciona os pré-cadastrados (sem ID real ainda)
-    for (var pre in preCadastrados) {
-       alunos.add(AlunoChamada(
-         id: 'pre_${pre['email']}', // ID temporário
-         nome: pre['nome'],
-         ra: 'Pendente', // Indica que ainda não entrou no app
-       ));
-    }
+      // Adiciona os pré-cadastrados (sem ID real ainda)
+      for (var pre in preCadastrados) {
+         alunos.add(AlunoChamada(
+           id: 'pre_${pre['email']}', 
+           nome: pre['nome'],
+           ra: 'Pendente', 
+         ));
+      }
 
-    // Ordena alfabeticamente
-    alunos.sort((a, b) => a.nome.compareTo(b.nome));
-    
-    return alunos;
-  }
-  
-  Future<Map<String, dynamic>?> getAulaPorDia(String turmaId, DateTime data) async {
-    final dataString = DateFormat('yyyy-MM-dd').format(data);
-    final doc = await _db
-        .collection('turmas')
-        .doc(turmaId)
-        .collection('aulas')
-        .doc(dataString)
-        .get();
-        
-    return doc.data();
+      // Ordena alfabeticamente
+      alunos.sort((a, b) => a.nome.compareTo(b.nome));
+      
+      return alunos;
+    } catch (e) {
+      debugPrint("Erro ao carregar alunos: $e");
+      return [];
+    }
   }
 
   // ===========================================================================
-  // 3. STREAMS (DADOS EM TEMPO REAL)
+  // 3. HISTÓRICO DE CHAMADAS E PRESENÇA (CORRIGIDO)
+  // ===========================================================================
+
+  /// Retorna Stream com IDs das datas (ex: "2023-10-25") ordenadas
+  Future<List<String>> getDatasChamadas(String turmaId) async {
+    final query = await _db
+        .collection('turmas')
+        .doc(turmaId)
+        .collection('aulas') 
+        .orderBy('data', descending: true)
+        .get();
+    return query.docs.map((d) => d.id).toList();
+  }
+
+  /// Busca detalhes de uma chamada (quem estava presente)
+  Future<Map<String, dynamic>> getDadosChamada(String turmaId, String dataId) async {
+    try {
+      final doc = await _db
+          .collection('turmas')
+          .doc(turmaId)
+          .collection('aulas')
+          .doc(dataId)
+          .get();
+      return doc.data() ?? {};
+    } catch (e) {
+      debugPrint("Erro ao buscar dados da chamada: $e");
+      return {};
+    }
+  }
+  /// Atualiza manualmente o histórico (Incluir/Excluir alunos)
+  /// Aceita listas separadas para início e fim.
+  Future<void> atualizarChamadaHistorico(
+    String turmaId, 
+    String dataId, 
+    List<String> presentesInicio, 
+    List<String> presentesFim
+  ) async {
+    try {
+      await _db
+          .collection('turmas')
+          .doc(turmaId)
+          .collection('aulas')
+          .doc(dataId)
+          .update({
+            'presentes_inicio': presentesInicio,
+            'presentes_fim': presentesFim, 
+            'ultima_atualizacao': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      debugPrint("Erro ao atualizar histórico: $e");
+      throw Exception("Erro ao atualizar histórico.");
+    }
+  }
+
+  /// Salva a presença automática via NFC
+  Future<void> salvarPresenca(
+      String turmaId, String tipoChamada, List<String> presentesUids, DateTime dataChamada) async {
+    
+    final dataString = DateFormat('yyyy-MM-dd').format(dataChamada);
+    final docRef = _db
+        .collection('turmas')
+        .doc(turmaId)
+        .collection('aulas') 
+        .doc(dataString);
+
+    final String campo = 'presentes_$tipoChamada'; 
+
+    await docRef.set(
+      {
+        'data': Timestamp.fromDate(dataChamada),
+        campo: presentesUids,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  // ===========================================================================
+  // 4. STREAMS E OUTROS MÉTODOS DO APP
   // ===========================================================================
   
   Stream<List<TurmaProfessor>> getTurmasProfessor(String professorUid) {
@@ -142,8 +249,9 @@ class ServicoFirestore {
             .map((doc) => TurmaProfessor.fromMap(doc.data()!, doc.id))
             .toList());
   }
-  
-  Stream<List<SolicitacaoAluno>> getSolicitacoes(String professorUid) {
+
+  // Para o Professor ver solicitações
+  Stream<List<SolicitacaoAluno>> getSolicitacoesProfessor(String professorUid) {
     return _db
         .collection('solicitacoes')
         .where('professorId', isEqualTo: professorUid)
@@ -151,6 +259,21 @@ class ServicoFirestore {
         .map((snapshot) => snapshot.docs
             .map((doc) => SolicitacaoAluno.fromMap(doc.data()!, doc.id))
             .toList());
+  }
+
+  // Para o Aluno filtrar as dele (Stream global)
+  Stream<List<SolicitacaoAluno>> getTodasSolicitacoesStream() {
+    return _db
+        .collection('solicitacoes')
+        .orderBy('data', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => SolicitacaoAluno.fromMap(doc.data()!, doc.id))
+            .toList());
+  }
+
+  Stream<List<SolicitacaoAluno>> getSolicitacoes(String professorUid) {
+    return getSolicitacoesProfessor(professorUid);
   }
   
   Stream<List<TurmaProfessor>> getTurmasAluno(String alunoUid) {
@@ -193,7 +316,9 @@ class ServicoFirestore {
         .snapshots();
   }
   
-  Stream<List<ProvaAgendada>> getCalendarioDeProvas() {
+  // --- MÉTODOS DE PROVAS ---
+
+  Stream<List<ProvaAgendada>> getTodasProvas() { // Para o Calendário
     return _db
         .collection('provas') 
         .orderBy('dataHora', descending: false) 
@@ -202,10 +327,13 @@ class ServicoFirestore {
             .map((doc) => ProvaAgendada.fromMap(doc.data()!, doc.id))
             .toList());
   }
-  
 
+  Stream<List<ProvaAgendada>> getCalendarioDeProvas() { // Mantido
+    return getTodasProvas();
+  }
+  
   // ===========================================================================
-  // 4. HUB DA DISCIPLINA (Chat, Materiais, Dicas)
+  // 5. HUB DA DISCIPLINA (Chat, Materiais, Dicas)
   // ===========================================================================
 
   Stream<List<MensagemChat>> getStreamMensagens(String turmaId) {
@@ -321,7 +449,7 @@ class ServicoFirestore {
   }
 
   // ===========================================================================
-  // 5. DRIVE DE PROVAS
+  // 6. DRIVE E OUTROS (CSV, GESTÃO)
   // ===========================================================================
 
   Stream<List<PastaDrive>> getPastasDrive({String? parentId}) {
@@ -355,10 +483,6 @@ class ServicoFirestore {
     await _db.collection('drive_arquivos').add(data);
   }
 
-  // ===========================================================================
-  // 6. GESTÃO, CSV E ESCRITA
-  // ===========================================================================
-
   Future<void> enviarSugestao(String texto, String autorId) async {
     await _db.collection('sugestoes').add({
       'texto': texto,
@@ -367,31 +491,9 @@ class ServicoFirestore {
     });
   }
 
-  Stream<List<String>> getDatasChamadas(String turmaId) {
-    return _db
-        .collection('turmas')
-        .doc(turmaId)
-        .collection('aulas')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
-  }
-
-  Future<Map<String, dynamic>> getDadosChamada(String turmaId, String dataId) async {
-    final doc = await _db.collection('turmas').doc(turmaId).collection('aulas').doc(dataId).get();
-    return doc.data() ?? {};
-  }
-
-  Future<void> atualizarChamadaHistorico(String turmaId, String dataId, List<String> presentesInicio, List<String> presentesFim) async {
-    await _db.collection('turmas').doc(turmaId).collection('aulas').doc(dataId).update({
-      'presentes_inicio': presentesInicio,
-      'presentes_fim': presentesFim,
-    });
-  }
-
-  // --- NOVO: IMPORTAR ALUNOS VIA CSV ---
+  // --- IMPORTAR ALUNOS VIA CSV ---
   Future<Map<String, int>> importarAlunosCSV(String turmaId, File arquivoCsv) async {
     final input = await arquivoCsv.readAsString();
-    // Converte o CSV para Lista (Assumindo separador padrão ou ,)
     List<List<dynamic>> rows = const CsvToListConverter().convert(input);
 
     final turmaDocRef = _db.collection('turmas').doc(turmaId);
@@ -399,7 +501,6 @@ class ServicoFirestore {
     int adicionadosComConta = 0;
     int adicionadosSemConta = 0;
 
-    // Usa transação para segurança
     await _db.runTransaction((transaction) async {
       final snapshot = await transaction.get(turmaDocRef);
       if (!snapshot.exists) throw Exception("Turma não encontrada!");
@@ -408,24 +509,20 @@ class ServicoFirestore {
       List<Map<String, dynamic>> preCadastradosAtuais = List<Map<String, dynamic>>.from(snapshot.data()!['alunosPreCadastrados'] ?? []);
 
       for (var row in rows) {
-        // Ignora linhas vazias ou cabeçalhos inválidos (sem @)
         if (row.length < 2 || !row[1].toString().contains('@')) continue;
 
         String nome = row[0].toString().trim();
         String email = row[1].toString().trim();
 
-        // Verifica se o usuário já existe no App
         final userQuery = await _db.collection('usuarios').where('email', isEqualTo: email).limit(1).get();
 
         if (userQuery.docs.isNotEmpty) {
-          // Existe: Adiciona na lista oficial (UID)
           String uid = userQuery.docs.first.id;
           if (!inscritosAtuais.contains(uid)) {
             inscritosAtuais.add(uid);
             adicionadosComConta++;
           }
         } else {
-          // Não Existe: Adiciona no pré-cadastro
           bool jaExiste = preCadastradosAtuais.any((e) => e['email'] == email);
           if (!jaExiste) {
             preCadastradosAtuais.add({'nome': nome, 'email': email});
@@ -443,77 +540,92 @@ class ServicoFirestore {
     return {'comConta': adicionadosComConta, 'semConta': adicionadosSemConta};
   }
 
-  // --- NOVO: COMPARTILHAR PLANILHA (CSV) ---
-  Future<void> compartilharPlanilhaTurma(String turmaId, String nomeTurma) async {
-    // Gera os dados
-    String csvData = await gerarPlanilhaTurma(turmaId);
+  // --- COMPARTILHAR PLANILHA DE PRESENÇAS ---
+  Future<void> compartilharPlanilhaTurma(String turmaId, String nomeDisciplina) async {
+    try {
+      // 1. Buscar Alunos (já ordenados)
+      final alunosRefs = await getAlunosDaTurma(turmaId); 
+      
+      // 2. Buscar Histórico de Chamadas (Datas)
+      final snapshot = await _db
+          .collection('turmas')
+          .doc(turmaId)
+          .collection('aulas')
+          .orderBy('data', descending: false)
+          .get();
 
-    // Salva arquivo temporário
-    final directory = await getTemporaryDirectory();
-    final path = "${directory.path}/presenca_${nomeTurma.replaceAll(' ', '_')}.csv";
-    final file = File(path);
-    await file.writeAsString(csvData, mode: FileMode.writeOnly);
+      List<List<dynamic>> rows = [];
+      List<dynamic> header = ["Aluno / Data"];
+      List<String> datasHeaders = [];
+      Map<String, Set<String>> mapaPresencas = {};
 
-    // Abre menu de compartilhar
-    await Share.shareXFiles([XFile(path)], text: 'Planilha de presença: $nomeTurma');
-  }
+      for (var doc in snapshot.docs) {
+        final dataMap = doc.data();
+        final timestamp = dataMap['data'] as Timestamp;
+        final dateStr = DateFormat('dd/MM').format(timestamp.toDate());
+        
+        String headerDate = dateStr;
+        int count = 1;
+        while (datasHeaders.contains(headerDate)) {
+          count++;
+          headerDate = "$dateStr ($count)";
+        }
+        
+        datasHeaders.add(headerDate);
+        header.add(headerDate);
 
-  // GERAÇÃO DE PLANILHA INTERNA
-  Future<String> gerarPlanilhaTurma(String turmaId) async {
-    final alunosDoc = await _db.collection('turmas').doc(turmaId).get();
-    final List<String> alunoUids = List<String>.from(alunosDoc.data()!['alunosInscritos'] ?? []);
-    
-    Map<String, String> nomesAlunos = {};
-    for (var uid in alunoUids) {
-      final u = await getUsuario(uid);
-      nomesAlunos[uid] = u?.alunoInfo?.nomeCompleto ?? 'Desconhecido';
-    }
-
-    // Incluir também os pré-cadastrados na planilha? (Opcional, mas útil)
-    final List<Map<String, dynamic>> preCadastrados = List<Map<String, dynamic>>.from(alunosDoc.data()!['alunosPreCadastrados'] ?? []);
-
-    final aulasSnapshot = await _db.collection('turmas').doc(turmaId).collection('aulas').orderBy('data').get();
-    
-    String csv = "\uFEFFNome do Aluno"; 
-    List<String> datas = [];
-    
-    for (var doc in aulasSnapshot.docs) {
-       DateTime dataAula = (doc.data()['data'] as Timestamp).toDate();
-       String dataFormatada = DateFormat('dd/MM').format(dataAula);
-       datas.add(doc.id); 
-       csv += ";$dataFormatada"; 
-    }
-    csv += "\n";
-
-    // Linhas dos Inscritos
-    for (var uid in alunoUids) {
-      csv += "${nomesAlunos[uid]}";
-      for (var data in datas) {
-        final aulaDoc = aulasSnapshot.docs.firstWhere((d) => d.id == data);
-        final dadosAula = aulaDoc.data();
-        final presentes = List<String>.from(dadosAula['presentes_inicio'] ?? []) + List<String>.from(dadosAula['presentes_fim'] ?? []);
-        csv += presentes.contains(uid) ? ";P" : ";F";
+        final pInicio = List<String>.from(dataMap['presentes_inicio'] ?? []);
+        final pFim = List<String>.from(dataMap['presentes_fim'] ?? []);
+        mapaPresencas[headerDate] = {...pInicio, ...pFim};
       }
-      csv += "\n";
-    }
-    
-    // Linhas dos Pré-Cadastrados (Sempre Faltas, pois não têm conta)
-    for (var pre in preCadastrados) {
-      csv += "${pre['nome']} (Pendente)";
-      for (var _ in datas) {
-         csv += ";-";
+      
+      header.add("Total Presencas");
+      header.add("Total Faltas");
+      rows.add(header);
+
+      for (var aluno in alunosRefs) {
+        List<dynamic> row = [];
+        row.add(aluno.nome);
+
+        int presencasCount = 0;
+        int faltasCount = 0;
+
+        for (var dataHeader in datasHeaders) {
+          final presentesNesseDia = mapaPresencas[dataHeader] ?? {};
+          
+          if (presentesNesseDia.contains(aluno.id)) {
+            row.add("P");
+            presencasCount++;
+          } else {
+            row.add("F");
+            faltasCount++;
+          }
+        }
+
+        row.add(presencasCount);
+        row.add(faltasCount);
+        rows.add(row);
       }
-      csv += "\n";
+
+      String csv = const ListToCsvConverter(fieldDelimiter: ';').convert(rows);
+      
+      final directory = await getTemporaryDirectory();
+      final path = "${directory.path}/Presenca_$nomeDisciplina.csv";
+      final file = File(path);
+      await file.writeAsBytes([0xEF, 0xBB, 0xBF] + csv.codeUnits);
+      
+      await Share.shareXFiles([XFile(path)], text: 'Planilha de Presença - $nomeDisciplina');
+
+    } catch (e) {
+      debugPrint("Erro ao gerar planilha: $e");
+      throw Exception("Erro ao gerar planilha: $e");
     }
-
-    return csv;
   }
-
 
   Future<void> atualizarSolicitacao(String solicitacaoId, StatusSolicitacao novoStatus, String resposta) async {
     await _db.collection('solicitacoes').doc(solicitacaoId).update({
       'status': novoStatus.name,
-      'respostaProfessor': resposta,
+      'resposta': resposta,
     });
   }
 
@@ -587,36 +699,13 @@ class ServicoFirestore {
   Future<void> adicionarProva(ProvaAgendada prova) async {
     await _db.collection('provas').add(prova.toMap());
   }
-  
 
   Future<void> adicionarSolicitacao(SolicitacaoAluno solicitacao) async {
     await _db.collection('solicitacoes').add(solicitacao.toMap());
   }
-
-  Future<void> salvarPresenca(
-      String turmaId, String tipoChamada, List<String> presentesUids, DateTime dataChamada) async {
-    
-    final dataString = DateFormat('yyyy-MM-dd').format(dataChamada);
-    final docRef = _db
-        .collection('turmas')
-        .doc(turmaId)
-        .collection('aulas') 
-        .doc(dataString);
-
-    final String campo = 'presentes_$tipoChamada'; 
-
-    await docRef.set(
-      {
-        'data': Timestamp.fromDate(dataChamada),
-        campo: presentesUids,
-      },
-      SetOptions(merge: true),
-    );
-  }
   
   Future<void> salvarPresencaEvento(String eventoId, List<String> presentesUids) async {
     final docRef = _db.collection('eventos').doc(eventoId);
-    
     await docRef.update({
       'participantesPresentes': FieldValue.arrayUnion(presentesUids),
     });

@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../models/turma_professor.dart';
-import '../../models/aluno_chamada.dart'; 
+import '../../models/aluno_chamada.dart';
 import '../../providers/provedor_professor.dart';
-import '../../providers/provedor_aluno.dart'; // Importante: Reutiliza a lógica de leitura de cartão
+
 import '../../services/servico_firestore.dart';
 import '../../l10n/app_localizations.dart'; 
 import '../comum/widget_carregamento.dart'; 
@@ -46,8 +45,6 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
   @override
   void dispose() {
     _nfcIdController.dispose();
-    // É boa prática parar a leitura se sair da tela
-    // ref.read(provedorCadastroNFC.notifier).reset(); // Não podemos chamar ref aqui no dispose
     super.dispose();
   }
 
@@ -79,7 +76,11 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')), 
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     } finally {
@@ -91,19 +92,15 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final estadoAlunos = ref.watch(provedorChamadaManual(widget.turma.id));
-    
-    // Observa o estado do leitor NFC (reutilizando do aluno)
     final estadoNFC = ref.watch(provedorCadastroNFC);
     final notifierNFC = ref.read(provedorCadastroNFC.notifier);
 
-    // Listener: Se ler um cartão com sucesso, preenche o campo
     ref.listen(provedorCadastroNFC, (previous, next) {
       if (next.status == StatusCadastroNFC.success && next.uid != null) {
          _nfcIdController.text = next.uid!;
          ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text("Cartão lido!"), backgroundColor: Colors.green)
          );
-         // Para a leitura após sucesso para economizar bateria
          notifierNFC.reset();
       }
       if (next.status == StatusCadastroNFC.error && next.erro != null) {
@@ -128,7 +125,6 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                   Text(widget.turma.nome, style: Theme.of(context).textTheme.titleLarge),
                   const Divider(height: 24),
                   
-                  // 1. Seleção de Aluno
                   if (estadoAlunos.status == StatusChamadaManual.carregando)
                       const WidgetCarregamento(texto: 'Carregando alunos...')
                   else if (estadoAlunos.status == StatusChamadaManual.erro)
@@ -153,9 +149,8 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
 
                   const SizedBox(height: 24),
                   
-                  // 2. Campo de ID do Cartão + Botão de Leitura
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Alinha no topo se der erro de validação
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextFormField(
@@ -164,7 +159,6 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                             labelText: t.t('nfc_manual_id_cartao'),
                             hintText: '04:A1:B2...',
                             border: const OutlineInputBorder(),
-                            // Adiciona ícone indicador se estiver lendo
                             suffixIcon: estadoNFC.status == StatusCadastroNFC.scanning 
                                 ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)) 
                                 : null
@@ -175,12 +169,11 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                       ),
                       const SizedBox(width: 12),
                       
-                      // Botão "Ler Cartão"
                       SizedBox(
-                        height: 56, // Altura padrão do input para alinhar
+                        height: 56,
                         child: ElevatedButton(
                           onPressed: (estadoNFC.status == StatusCadastroNFC.scanning) 
-                              ? null // Desabilita se já estiver lendo
+                              ? null
                               : () => notifierNFC.iniciarLeitura(),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryPurple,
@@ -193,12 +186,11 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
                     ],
                   ),
                   
-                  // Aviso se estiver lendo
                   if (estadoNFC.status == StatusCadastroNFC.scanning)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
-                        t.t('nfc_cadastro_instrucao'), // "Aproxime o cartão"
+                        t.t('nfc_cadastro_instrucao'),
                         style: const TextStyle(color: AppColors.primaryPurple, fontStyle: FontStyle.italic),
                         textAlign: TextAlign.center,
                       ),
@@ -206,7 +198,6 @@ class _TelaCadastroNfcManualState extends ConsumerState<TelaCadastroNfcManual> {
 
                   const SizedBox(height: 32),
                   
-                  // 3. Botão Salvar
                   ElevatedButton.icon(
                     icon: _isLoading
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

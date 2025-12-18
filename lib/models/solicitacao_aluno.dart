@@ -1,4 +1,5 @@
 // lib/models/solicitacao_aluno.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum StatusSolicitacao { pendente, aprovada, recusada }
@@ -16,7 +17,7 @@ class SolicitacaoAluno {
   final String alunoId;
   final String professorId;
   final String turmaId;
-  final String? respostaProfessor;
+  final String? resposta; 
 
   SolicitacaoAluno({
     required this.id,
@@ -31,7 +32,7 @@ class SolicitacaoAluno {
     required this.alunoId,
     required this.professorId,
     required this.turmaId,
-    this.respostaProfessor,
+    this.resposta,
   });
 
   Map<String, dynamic> toMap() {
@@ -40,26 +41,26 @@ class SolicitacaoAluno {
       'ra': ra,
       'disciplina': disciplina,
       'tipo': tipo,
-      'data': Timestamp.fromDate(data), // Salva sempre como Timestamp
+      'data': Timestamp.fromDate(data), // Salva como Timestamp no Firestore
       'descricao': descricao,
       'anexo': anexo,
       'status': status.name,
       'alunoId': alunoId,
       'professorId': professorId,
       'turmaId': turmaId,
-      'respostaProfessor': respostaProfessor,
+      'resposta': resposta, // Salva com a chave 'resposta'
     };
   }
 
   factory SolicitacaoAluno.fromMap(Map<String, dynamic> map, String id) {
-    // --- CORREÇÃO DE DATA ---
+    // --- LÓGICA SEGURA DE DATA ---
     DateTime dataObj = DateTime.now();
     if (map['data'] is Timestamp) {
       dataObj = (map['data'] as Timestamp).toDate();
     } else if (map['data'] is String) {
       dataObj = DateTime.tryParse(map['data']) ?? DateTime.now();
     }
-    // ------------------------
+    // ----------------------------
 
     return SolicitacaoAluno(
       id: id,
@@ -75,7 +76,7 @@ class SolicitacaoAluno {
       alunoId: map['alunoId'] ?? '',
       professorId: map['professorId'] ?? '',
       turmaId: map['turmaId'] ?? '',
-      respostaProfessor: map['respostaProfessor'],
+      resposta: map['resposta'] ?? map['respostaProfessor'], // Tenta ler ambos por compatibilidade
     );
   }
 }

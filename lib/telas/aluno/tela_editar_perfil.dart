@@ -6,12 +6,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart';
 
-// Importações internas
 import '../../providers/provedor_autenticacao.dart';
 import '../../models/aluno_info.dart';
-import '../../l10n/app_localizations.dart'; // Traduções
-import '../../themes/app_theme.dart'; // Cores e Temas
-import '../comum/overlay_carregamento.dart'; // Loading
+import '../../l10n/app_localizations.dart';
+import '../../themes/app_theme.dart';
+import '../comum/overlay_carregamento.dart';
 
 /// Caso de uso para o Widgetbook.
 @UseCase(
@@ -71,7 +70,6 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
       _nomeController.text = alunoInfo?.nomeCompleto ?? '';
       _raController.text = alunoInfo?.ra ?? '';
       
-      // CORREÇÃO 1: Usando t.cursos (instância) em vez de AppLocalizations.cursos (estático)
       if (alunoInfo != null && t.cursos.contains(alunoInfo.curso)) {
         _cursoSelecionado = alunoInfo.curso;
       }
@@ -226,7 +224,6 @@ class _TelaEditarPerfilState extends ConsumerState<TelaEditarPerfil> {
                   style: TextStyle(color: textColor),
                   dropdownColor: theme.cardTheme.color, 
                   decoration: InputDecoration(hintText: t.t('editar_seleciona_curso')),
-                  // CORREÇÃO 2: Usando t.cursos
                   items: t.cursos.map((c) => DropdownMenuItem(
                     value: c, 
                     child: Text(c)

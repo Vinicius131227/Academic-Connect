@@ -87,7 +87,6 @@ class _AbaDicasAlunoState extends ConsumerState<AbaDicasAluno> {
     );
 
     try {
-      // CORRIGIDO: Passando apenas os 2 argumentos necessários (conforme atualizado no service)
       await ref.read(servicoFirestoreProvider).adicionarDica(widget.turmaId, novaDica);
       
       _dicaController.clear();
