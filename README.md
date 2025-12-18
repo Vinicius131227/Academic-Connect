@@ -1,16 +1,55 @@
-# ddm_projeto_final
+# 📱 Portal do Aluno - App de Gestão Acadêmica
 
-A new Flutter project.
+![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
+![Riverpod](https://img.shields.io/badge/State-Riverpod-purple?style=for-the-badge)
 
-## Getting Started
+Aplicativo móvel desenvolvido para facilitar a vida acadêmica dos estudantes, permitindo o acompanhamento de frequência, notas e informações detalhadas sobre disciplinas e professores em tempo real.
 
-This project is a starting point for a Flutter application.
+## 📸 Screenshots
 
-A few resources to get you started if this is your first Flutter project:
+| Tela de Login | Dashboard & Frequência | Detalhes da Disciplina | Recuperação de Senha |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/login.png" width="200"> | <img src="assets/screenshots/home.png" width="200"> | <img src="assets/screenshots/detalhes.png" width="200"> | <img src="assets/screenshots/recover.png" width="200"> |
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+> *Nota: Substitua os caminhos acima pelas imagens reais do seu projeto na pasta assets/screenshots.*
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ✨ Funcionalidades
+
+- **🔐 Autenticação Segura:** Login e Logout integrados com Firebase Authentication.
+- **🔄 Recuperação de Senha:** Fluxo completo com envio de link por e-mail e feedback visual.
+- **📊 Controle de Frequência:** - Cálculo automático de percentual de presença baseado em aulas cadastradas no Firestore.
+  - Indicadores visuais de status (Aprovado/Reprovado).
+- **📍 Localização e Contato:** - Visualização de sala de aula e e-mail do professor.
+  - **Integração com Mapas:** Abertura direta do Google Maps via *Plus Code* para localização exata do prédio/sala.
+  - Atalho para envio de e-mail direto ao docente.
+- **📝 Notas e Avaliações:** Visualização de desempenho acadêmico.
+- **☁️ Sincronização em Tempo Real:** Dados atualizados instantaneamente via Streams do Firestore.
+
+## 🛠️ Tecnologias Utilizadas
+
+- **Frontend:** [Flutter](https://flutter.dev/) (Dart)
+- **Backend (BaaS):** [Firebase](https://firebase.google.com/)
+  - **Authentication:** Gestão de usuários.
+  - **Firestore Database:** Banco de dados NoSQL em tempo real.
+- **Gerenciamento de Estado:** [Riverpod](https://riverpod.dev/) (Hooks & Providers).
+- **Pacotes Principais:**
+  - `cloud_firestore` & `firebase_auth`
+  - `flutter_riverpod`
+  - `url_launcher` (Para abrir Mapas e E-mail)
+  - `google_fonts` (Tipografia moderna)
+  - `percent_indicator` (Gráficos de frequência)
+
+## 🚀 Como Executar o Projeto
+
+### Pré-requisitos
+- Flutter SDK instalado.
+- Conta no Firebase configurada.
+
+### Passo a Passo
+
+1. **Clone o repositório:**
+   ```bash
+   git clone [https://github.com/SEU_USUARIO/NOME_DO_REPO.git](https://github.com/SEU_USUARIO/NOME_DO_REPO.git)
+   cd NOME_DO_REPO
