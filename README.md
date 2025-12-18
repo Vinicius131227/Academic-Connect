@@ -7,12 +7,6 @@
 
 Aplicativo móvel desenvolvido para facilitar a vida acadêmica dos estudantes, permitindo o acompanhamento de frequência, notas e informações detalhadas sobre disciplinas e professores em tempo real.
 
-## 📸 Screenshots
-
-| Tela de Login | Dashboard & Frequência | Detalhes da Disciplina | Recuperação de Senha |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/login.png" width="200"> | <img src="assets/screenshots/home.png" width="200"> | <img src="assets/screenshots/detalhes.png" width="200"> | <img src="assets/screenshots/recover.png" width="200"> |
-
 ## ✨ Funcionalidades
 
 - **🔐 Autenticação Segura:** Login e Logout integrados com Firebase Authentication.
