@@ -13,8 +13,6 @@ Aplicativo móvel desenvolvido para facilitar a vida acadêmica dos estudantes, 
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/login.png" width="200"> | <img src="assets/screenshots/home.png" width="200"> | <img src="assets/screenshots/detalhes.png" width="200"> | <img src="assets/screenshots/recover.png" width="200"> |
 
-> *Nota: Substitua os caminhos acima pelas imagens reais do seu projeto na pasta assets/screenshots.*
-
 ## ✨ Funcionalidades
 
 - **🔐 Autenticação Segura:** Login e Logout integrados com Firebase Authentication.
